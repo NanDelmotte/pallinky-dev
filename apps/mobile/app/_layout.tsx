@@ -1,42 +1,30 @@
 /** * Path: apps/mobile/app/_layout.tsx 
- * Description: Main app controller. Fixed route name warnings by using 'auth' instead of 'auth/index'.
+ * Description: Safety Layout. Removed automatic redirection loop to stabilize the UI.
  */
-import { useEffect } from 'react';
-import { Stack, useRouter, useSegments } from 'expo-router';
-import { useSession, SessionProvider } from '@pallinky/core';
+import { Stack } from 'expo-router';
+import { SessionProvider, useSession } from '@pallinky/core';
 import { View, ActivityIndicator } from 'react-native';
 
-function NavigationGuard() {
-  const { userEmail, loading } = useSession();
-  const segments = useSegments();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (loading) return;
-
-    const inAuthGroup = segments[0] === 'auth' || segments[0] === '(auth)';
-
-    if (!userEmail && !inAuthGroup) {
-      router.replace('/auth');
-    } else if (userEmail && inAuthGroup) {
-      router.replace('/(tabs)');
-    }
-  }, [userEmail, loading, segments]);
+function RootLayoutNav() {
+  const { loading, userEmail } = useSession();
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#ffffff' }}>
-        <ActivityIndicator size="large" color="#0077b6" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8e9dc' }}>
+        <ActivityIndicator size="large" color="#43691b" />
       </View>
     );
   }
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="auth" options={{ gestureEnabled: false }} />
-      <Stack.Screen name="(tabs)" options={{ gestureEnabled: false }} />
+      {/* If no email, only show Auth. If email exists, show the Tabs (Hub) */}
+      {!userEmail ? (
+        <Stack.Screen name="auth/index" options={{ title: 'Login', gestureEnabled: false }} />
+      ) : (
+        <Stack.Screen name="(tabs)" options={{ gestureEnabled: false }} />
+      )}
       <Stack.Screen name="settings" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="m/[token]/studio" options={{ headerShown: true, title: 'Studio' }} />
     </Stack>
   );
 }
@@ -44,7 +32,7 @@ function NavigationGuard() {
 export default function RootLayout() {
   return (
     <SessionProvider>
-      <NavigationGuard />
+      <RootLayoutNav />
     </SessionProvider>
   );
 }
