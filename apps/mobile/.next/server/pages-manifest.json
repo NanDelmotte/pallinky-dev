@@ -1,0 +1,6 @@
+{
+  "/_app": "pages/_app.js",
+  "/event/[slug]": "pages/event/[slug].js",
+  "/_error": "pages/_error.js",
+  "/_document": "pages/_document.js"
+}

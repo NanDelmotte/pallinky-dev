@@ -1,0 +1,88 @@
+/** * Path: app/(tabs)/index.tsx 
+ * Description: Social Map with Host faces, RSVP counts, and visible Settings gear. 
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Dimensions, Image } from 'react-native';
+import { StyledText } from '../../components/ui/BaseComponents';
+import { supabase } from '@tarti-flette/core';
+import { useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
+import { Ionicons } from '@expo/vector-icons';
+
+const { width } = Dimensions.get('window');
+const RADAR_SIZE = width * 0.95;
+const CENTER = RADAR_SIZE / 2;
+
+export default function SocialMapFinal() {
+  const [events, setEvents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+
+  useEffect(() => {
+    async function fetchMap() {
+      try {
+        const userEmail = await SecureStore.getItemAsync('pallinky_user_email');
+        const cleanEmail = userEmail?.toLowerCase().trim();
+        const { data } = await supabase.from('events').select('*, profiles!fk_host_profile(avatar_url), rsvps(*)').eq('status', 'active');
+        
+        if (data) {
+          const positioned = data.map((event, index) => {
+            const angle = (index / data.length) * 2 * Math.PI;
+            const myRsvp = event.rsvps?.find((r: any) => r.email_lc === cleanEmail);
+            const isHosting = event.host_email?.toLowerCase() === cleanEmail;
+            const goingCount = event.rsvps?.filter((r: any) => r.status === 'yes').length || 0;
+            let radius = RADAR_SIZE * 0.4; 
+            if (isHosting || myRsvp?.status === 'yes') radius = RADAR_SIZE * 0.08;
+            else if (myRsvp) radius = RADAR_SIZE * 0.25;
+            return { ...event, x: CENTER + radius * Math.cos(angle), y: CENTER + radius * Math.sin(angle), goingCount, hostAvatar: event.profiles?.avatar_url };
+          });
+          setEvents(positioned);
+        }
+      } catch (err) { console.error(err); } finally { setLoading(false); }
+    }
+    fetchMap();
+  }, []);
+
+  if (loading) return <View style={styles.container}><ActivityIndicator size="large" color="#43691b" /></View>;
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <StyledText style={styles.title}>Social Map</StyledText>
+        <TouchableOpacity style={styles.settingsBtn} onPress={() => router.push('/settings' as any)}>
+          <View style={styles.iconCircleBg}><Ionicons name="settings-outline" size={24} color="#1f2a1b" /></View>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.mapArea}>
+        <View style={styles.radarWrapper}>
+          <View style={[styles.ring, { width: RADAR_SIZE, height: RADAR_SIZE, borderRadius: RADAR_SIZE/2, backgroundColor: '#bac9ad', borderWidth: 1, borderColor: '#fff' }]} />
+          <View style={[styles.ring, { width: RADAR_SIZE * 0.66, height: RADAR_SIZE * 0.66, borderRadius: (RADAR_SIZE*0.66)/2, backgroundColor: '#d1dec5', borderWidth: 1, borderColor: '#fff' }]} />
+          <View style={[styles.ring, { width: RADAR_SIZE * 0.33, height: RADAR_SIZE * 0.33, borderRadius: (RADAR_SIZE*0.33)/2, backgroundColor: '#e8f0e0', borderWidth: 1, borderColor: '#fff' }]} />
+          {events.map((event) => (
+            <TouchableOpacity key={event.id} style={[styles.node, { left: event.x - 25, top: event.y - 25 }]} onPress={() => router.push({ pathname: "/peek/[id]", params: { id: event.id } } as any)}>
+              <View style={styles.faceCircle}>
+                {event.hostAvatar ? <Image source={{ uri: event.hostAvatar }} style={styles.avatar} /> : <StyledText style={{fontSize: 20}}>👤</StyledText>}
+                {event.goingCount > 0 && <View style={styles.badge}><StyledText style={styles.badgeText}>{event.goingCount}</StyledText></View>}
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#f8e9dc' },
+  header: { paddingTop: 60, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', width: '100%', paddingHorizontal: 20 },
+  settingsBtn: { position: 'absolute', right: 20, top: 60 },
+  iconCircleBg: { backgroundColor: 'rgba(255,255,255,0.8)', padding: 8, borderRadius: 20 },
+  title: { fontSize: 26, fontWeight: '900', color: '#1f2a1b' },
+  mapArea: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  radarWrapper: { width: RADAR_SIZE, height: RADAR_SIZE, justifyContent: 'center', alignItems: 'center' },
+  ring: { position: 'absolute' },
+  node: { position: 'absolute', zIndex: 100 },
+  faceCircle: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', elevation: 4, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 4, borderWidth: 2, borderColor: '#fff' },
+  avatar: { width: 46, height: 46, borderRadius: 23 },
+  badge: { position: 'absolute', right: -5, top: -5, backgroundColor: '#fe5d9f', borderRadius: 10, width: 20, height: 20, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#fff' },
+  badgeText: { color: '#fff', fontSize: 10, fontWeight: 'bold' }
+});*/

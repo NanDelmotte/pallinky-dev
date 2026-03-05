@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "Pallinky",
+    "slug": "tarti-flette",
+    "scheme": "pallinky",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#f8e9dc"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nancy.tartiflette",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Pallinky uses your location to show you nearby bars, restaurants, and venues for your plans.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#f8e9dc"
+      },
+      "package": "com.nancy.tartiflette",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
+    },
+    "extra": {
+      "eas": {
+        "projectId": "501d9f7d-62c0-47d5-9747-011f79383a97"
+      }
+    },
+    "owner": "nanbowles"
+  }
+}
