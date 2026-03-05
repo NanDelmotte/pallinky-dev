@@ -1,12 +1,28 @@
 /** * Path: apps/mobile/app/_layout.tsx 
- * Description: Safety Layout. Removed automatic redirection loop to stabilize the UI.
+ * Description: Final Layout with Deep Link listener to catch Magic Links.
  */
+import { useEffect } from 'react';
 import { Stack } from 'expo-router';
-import { SessionProvider, useSession } from '@pallinky/core';
+import * as Linking from 'expo-linking';
+import { SessionProvider, useSession, supabase } from '@pallinky/core';
 import { View, ActivityIndicator } from 'react-native';
 
 function RootLayoutNav() {
   const { loading, userEmail } = useSession();
+
+  useEffect(() => {
+    // This catches the link if the app was already open in the background
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      if (url) {
+        // Force Supabase to check for the new session immediately
+        supabase.auth.getSession();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   if (loading) {
     return (
