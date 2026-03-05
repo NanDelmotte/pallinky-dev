@@ -17,10 +17,16 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.nancy.tartiflette",
+      "bundleIdentifier": "com.nancy.pallinky",
+      "associatedDomains": ["applinks:501d9f7d-62c0-47d5-9747-011f79383a97.supabase.co"],
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Pallinky uses your location to show you nearby bars, restaurants, and venues for your plans.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": ["pallinky"]
+          }
+        ]
       }
     },
     "android": {
@@ -28,10 +34,20 @@
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#f8e9dc"
       },
-      "package": "com.nancy.tartiflette",
+      "package": "com.nancy.pallinky",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "pallinky"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ],
       "permissions": [
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION"
       ]
@@ -46,7 +62,10 @@
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/501d9f7d-62c0-47d5-9747-011f79383a97"
+      "url": "https://u.expo.dev/501d9f7d-62c0-47d5-9747-011f79383a97",
+      "requestHeaders": {
+        "expo-channel-name": "preview"
+      }
     }
   }
 }
