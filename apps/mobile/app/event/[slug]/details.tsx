@@ -6,9 +6,9 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView, TouchableOpacity, Image, SafeAreaView, Platform, Linking, StatusBar } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { supabase } from '@tarti-flette/core';
+import { supabase } from '@pallinky/core';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { CalendarButton } from '@tarti-flette/ui';
+import { CalendarButton } from '@pallinky/ui';
 
 const PALETTES: Record<string, { bg: string; accent: string; text: string; isDark: boolean }> = {
   "zen": { bg: "#f8e9dc", accent: "#43691b", text: "#1f2a1b", isDark: false },

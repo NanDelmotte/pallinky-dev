@@ -3,10 +3,10 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, FlatList, ActivityIndicator, Platform, RefreshControl, SafeAreaView, Modal, ScrollView, TouchableOpacity, StatusBar, Alert } from 'react-native';
-import { StyledText } from '@tarti-flette/ui';
+import { StyledText } from '@pallinky/ui';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
-import { supabase } from '@tarti-flette/core';
+import { supabase } from '@pallinky/core';
 import * as SecureStore from 'expo-secure-store';
 import PlanCard from '../../../../packages/ui/src/PlanCard';
 

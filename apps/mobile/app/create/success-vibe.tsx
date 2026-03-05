@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, TouchableOpacity, Share, TextInput, Alert, SafeAreaView, Keyboard, TouchableWithoutFeedback, ScrollView, Animated, Dimensions, StatusBar, Platform } from 'react-native';
-import { StyledText } from '@tarti-flette/ui';
+import { StyledText } from '@pallinky/ui';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';

@@ -3,8 +3,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, TextInput, TouchableOpacity, Alert, ScrollView, Image, ActivityIndicator } from 'react-native';
-import { StyledText } from '@tarti-flette/ui';
-import { supabase } from '@tarti-flette/core';
+import { StyledText } from '@pallinky/ui';
+import { supabase } from '@pallinky/core';
 import * as SecureStore from 'expo-secure-store';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -132,9 +132,10 @@ export default function SettingsFinal() {
     }
   };
 
-  const handleSwitchIdentity = async () => {
+ const handleSwitchIdentity = async () => {
     await SecureStore.deleteItemAsync('pallinky_user_email');
-    router.replace('/');
+    // Force a hard redirect to the auth page
+    router.replace('/auth');
   };
 
   return (

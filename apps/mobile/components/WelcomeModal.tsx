@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Modal, View, StyleSheet, TouchableOpacity, Platform } from 'react-native';
-import { StyledText } from '@tarti-flette/ui';
+import { StyledText } from '@pallinky/ui';
 import * as SecureStore from 'expo-secure-store';
 import { Ionicons } from '@expo/vector-icons';
 

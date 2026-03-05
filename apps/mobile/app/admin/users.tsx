@@ -5,8 +5,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Image, TouchableOpacity, Alert, ActivityIndicator, FlatList } from 'react-native';
-import { StyledText } from '@tarti-flette/ui';
-import { supabase } from '@tarti-flette/core';
+import { StyledText } from '@pallinky/ui';
+import { supabase } from '@pallinky/core';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';

@@ -31,6 +31,8 @@
       "package": "com.nancy.tartiflette",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION"
       ]
     },
@@ -39,6 +41,12 @@
         "projectId": "501d9f7d-62c0-47d5-9747-011f79383a97"
       }
     },
-    "owner": "nanbowles"
+    "owner": "nanbowles",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/501d9f7d-62c0-47d5-9747-011f79383a97"
+    }
   }
 }

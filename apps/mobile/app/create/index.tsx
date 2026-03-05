@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { StyledText } from '@tarti-flette/ui';
+import { StyledText } from '@pallinky/ui';
 import { router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 

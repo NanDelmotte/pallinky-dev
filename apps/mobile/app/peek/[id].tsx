@@ -5,9 +5,9 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Switch, Platform, StatusBar, Share, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { StyledText } from '@tarti-flette/ui';
+import { StyledText } from '@pallinky/ui';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { supabase } from '@tarti-flette/core';
+import { supabase } from '@pallinky/core';
 import * as SecureStore from 'expo-secure-store';
 
 export default function PeekPage() {

@@ -6,8 +6,8 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Alert, ScrollView, TouchableOpacity, Modal, TextInput, Image, SafeAreaView, Platform, Linking, StatusBar } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { supabase } from '@tarti-flette/core';
-import { CalendarButton } from '@tarti-flette/ui';
+import { supabase } from '@pallinky/core';
+import { CalendarButton } from '@pallinky/ui';
 import { Ionicons } from '@expo/vector-icons';
 
 const PALETTES: Record<string, { bg: string; accent: string; text: string; isDark: boolean }> = {

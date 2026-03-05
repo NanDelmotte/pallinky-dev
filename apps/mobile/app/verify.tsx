@@ -6,8 +6,8 @@ import React, { useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { supabase } from '@tarti-flette/core';
-import { StyledText } from '@tarti-flette/ui';
+import { supabase } from '@pallinky/core';
+import { StyledText } from '@pallinky/ui';
 
 export default function VerifyIdentity() {
   const { email } = useLocalSearchParams<{ email: string }>();

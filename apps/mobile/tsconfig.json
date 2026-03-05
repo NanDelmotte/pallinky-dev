@@ -5,10 +5,10 @@
     "baseUrl": ".",
     "paths": {
       "~/*": ["./*"],
-      "@tarti-flette/ui": ["../../packages/ui/src"],
-      "@tarti-flette/ui/*": ["../../packages/ui/src/*"],
-      "@tarti-flette/core": ["../../packages/core/src"],
-      "@tarti-flette/core/*": ["../../packages/core/src/*"]
+      "@pallinky/ui": ["../../packages/ui/src"],
+      "@pallinky/ui/*": ["../../packages/ui/src/*"],
+      "@pallinky/core": ["../../packages/core/src"],
+      "@pallinky/core/*": ["../../packages/core/src/*"]
     },
     "incremental": true,
     "isolatedModules": true,

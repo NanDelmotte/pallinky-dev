@@ -1,5 +1,5 @@
 /** * Path: app/(tabs)/index.tsx 
- * Description: Home Page Orchestrator. Removed hidden card/deletion logic. */
+ * Description: Home Page Orchestrator. Updated to @pallinky imports. */
 
 import React, { useState, useCallback } from 'react';
 import { ScrollView, View, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
@@ -8,8 +8,8 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { Ionicons } from '@expo/vector-icons';
 
-import { supabase } from '@tarti-flette/core';
-import { StyledText, DASHBOARD_THEMES } from '@tarti-flette/ui';
+import { supabase } from '@pallinky/core';
+import { StyledText, DASHBOARD_THEMES } from '@pallinky/ui';
 
 import MyPlansList from '../../components/dashboard/MyPlansList';
 import PendingInvites from '../../components/dashboard/PendingInvites';
@@ -32,7 +32,7 @@ export default function HomeScreen() {
       const email = await SecureStore.getItemAsync('pallinky_user_email');
       const theme = await SecureStore.getItemAsync('pallinky_theme');
       
-      if (!email) return router.replace('/');
+      if (!email) return router.replace('/auth');
       if (theme) setThemeKey(theme);
 
       const emailLower = email.toLowerCase().trim();

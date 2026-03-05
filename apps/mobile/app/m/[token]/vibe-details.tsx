@@ -4,10 +4,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
-import { StyledText } from '@tarti-flette/ui';
+import { StyledText } from '@pallinky/ui';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { supabase } from '@tarti-flette/core';
+import { supabase } from '@pallinky/core';
 
 export default function VibeDetailsScreen() {
   const { token } = useLocalSearchParams<{ token: string }>();

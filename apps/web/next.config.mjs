@@ -12,7 +12,7 @@ const nextConfig = {
   output: 'standalone',
   // Ensures the build includes the shared core package from the monorepo root
   outputFileTracingRoot: path.join(__dirname, '../../'),
-  transpilePackages: ['@tarti-flette/core'],
+  transpilePackages: ['@pallinky/core'],
 };
 
 export default nextConfig;

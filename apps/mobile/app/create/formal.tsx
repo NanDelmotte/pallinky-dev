@@ -6,12 +6,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, StatusBar, Platform, ScrollView, KeyboardAvoidingView, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { StyledText, StyledInput } from '@tarti-flette/ui';
+import { StyledText, StyledInput } from '@pallinky/ui';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, { DateTimePickerEvent, DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import * as SecureStore from 'expo-secure-store';
-import { supabase } from '@tarti-flette/core';
+import { supabase } from '@pallinky/core';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import * as Location from 'expo-location';
 

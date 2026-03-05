@@ -5,7 +5,7 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { Platform } from 'react-native';
-import { HapticTab } from '@tarti-flette/ui';
+import { HapticTab } from '@pallinky/ui';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function TabLayout() {

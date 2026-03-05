@@ -1,6 +1,6 @@
 
 {
-  "name": "@tarti-flette/web",
+  "name": "@pallinky/web",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -10,7 +10,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@tarti-flette/core": "workspace:*",
+    "@pallinky/core": "workspace:*",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.97.0",
     "next": "^15.1.11",

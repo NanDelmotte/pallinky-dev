@@ -4,7 +4,7 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { StyledText } from '@tarti-flette/ui';
+import { StyledText } from '@pallinky/ui';
 import PlanCard from '../../../../packages/ui/src/PlanCard';
 
 interface FriendsActivitiesListProps {

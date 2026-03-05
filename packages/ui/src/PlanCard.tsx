@@ -6,7 +6,7 @@ import React from 'react';
 import { View, Image, StyleSheet, Pressable, Platform, Alert } from 'react-native';
 import { StyledText } from './BaseComponents';
 import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '@tarti-flette/core';
+import { supabase } from '@pallinky/core';
 
 const PALETTES: Record<string, { bg: string; accent: string; text: string; isDark: boolean }> = {
   "zen": { bg: "#f8e9dc", accent: "#43691b", text: "#1f2a1b", isDark: false },

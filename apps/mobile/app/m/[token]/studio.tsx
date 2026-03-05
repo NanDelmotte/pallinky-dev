@@ -5,11 +5,11 @@ import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, SafeAreaView, Platform, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { supabase } from '@tarti-flette/core'; 
-import { StyledText } from '@tarti-flette/ui';
-import { GiphyPicker } from '@tarti-flette/ui';
-import { StudioPreview } from '@tarti-flette/ui';
-import {ImageSearchModal} from '@tarti-flette/ui';
+import { supabase } from '@pallinky/core'; 
+import { StyledText } from '@pallinky/ui';
+import { GiphyPicker } from '@pallinky/ui';
+import { StudioPreview } from '@pallinky/ui';
+import {ImageSearchModal} from '@pallinky/ui';
 import { Ionicons } from '@expo/vector-icons';
 import { decode } from 'base64-arraybuffer';
 

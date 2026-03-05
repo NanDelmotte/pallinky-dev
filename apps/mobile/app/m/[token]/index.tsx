@@ -4,8 +4,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Share, Alert, TextInput, Platform, Modal, KeyboardAvoidingView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { supabase } from '@tarti-flette/core'; 
-import { StyledText } from '@tarti-flette/ui';
+import { supabase } from '@pallinky/core'; 
+import { StyledText } from '@pallinky/ui';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 

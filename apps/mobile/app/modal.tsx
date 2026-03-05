@@ -1,8 +1,8 @@
 import { Link } from 'expo-router';
 import { StyleSheet } from 'react-native';
 
-import {ThemedText} from '@tarti-flette/ui';
-import {ThemedView} from '@tarti-flette/ui';
+import {ThemedText} from '@pallinky/ui';
+import {ThemedView} from '@pallinky/ui';
 
 export default function ModalScreen() {
   return (

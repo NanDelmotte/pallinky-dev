@@ -4,7 +4,7 @@ import {
   Alert, ScrollView, KeyboardAvoidingView, Platform 
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { supabase } from '@tarti-flette/core';
+import { supabase } from '@pallinky/core';
 
 export default function SeedConfirmedScreen() {
   const [loading, setLoading] = useState(false);

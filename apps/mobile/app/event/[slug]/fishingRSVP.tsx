@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Platform, Alert, TextInput, SafeAreaView, StatusBar, Image, Text, Linking } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { supabase, useSession } from '@tarti-flette/core';
+import { supabase, useSession } from '@pallinky/core';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 const PALETTES: Record<string, { bg: string; accent: string; text: string; isDark: boolean }> = {

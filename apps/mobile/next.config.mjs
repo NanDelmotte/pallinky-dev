@@ -9,7 +9,7 @@ const nextConfig = {
   output: 'standalone',
   outputFileTracingRoot: path.join(__dirname, '../../'),
   transpilePackages: [
-    '@tarti-flette/core',
+    '@pallinky/core',
     'expo',
     'expo-router',
     'expo-modules-core',

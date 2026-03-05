@@ -3,9 +3,9 @@
 
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, Text, TouchableOpacity, Alert, Modal, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
-import { StyledText } from '@tarti-flette/ui';
+import { StyledText } from '@pallinky/ui';
 import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '@tarti-flette/core';
+import { supabase } from '@pallinky/core';
 
 interface PeopleProps {
   data: {

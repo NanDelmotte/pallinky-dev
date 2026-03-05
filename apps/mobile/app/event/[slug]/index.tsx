@@ -6,7 +6,7 @@
 import React, { useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { supabase } from '@tarti-flette/core';
+import { supabase } from '@pallinky/core';
 
 export default function EventTrafficController() {
   const { slug } = useLocalSearchParams<{ slug: string }>();

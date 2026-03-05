@@ -4,7 +4,7 @@
 import { useEffect } from 'react';
 import { View, ActivityIndicator, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { supabase, useSession } from '@tarti-flette/core';
+import { supabase, useSession } from '@pallinky/core';
 
 export default function AuthCallback() {
   const router = useRouter();
