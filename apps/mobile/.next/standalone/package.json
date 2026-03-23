@@ -1,0 +1,20 @@
+{
+  "name": "pallinky-root",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace=apps/mobile"
+  },
+  "devDependencies": {
+    "babel-plugin-module-resolver": "^5.0.2",
+    "expo": "^54.0.33",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "react": "19.1.0",
+    "react-native": "0.81.5"
+  }
+}

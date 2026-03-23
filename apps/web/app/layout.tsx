@@ -1,12 +1,13 @@
-/** * Path: apps/web/app/layout.tsx 
- * Description: Root layout for the Web workspace. 
- * Provides the required HTML and Body tags for Next.js.
+/**
+ * Path: apps/web/app/layout.tsx
+ * Description: Root layout for the web app.
  */
-import type { Metadata } from "next";
+
+import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: "Pallinky",
-  description: "Plan your next vibe.",
+  title: 'Pallinky',
+  description: 'Good Times, Easy Plans',
 };
 
 export default function RootLayout({
@@ -16,9 +17,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body style={{ margin: 0, padding: 0, backgroundColor: '#ffffff' }}>
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

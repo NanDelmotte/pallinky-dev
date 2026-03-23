@@ -1,0 +1,10 @@
+{
+  "expo": {
+    "android": {
+      "package": "com.nanbowles.pallinkyroot"
+    },
+    "ios": {
+      "bundleIdentifier": "com.nanbowles.pallinkyroot"
+    }
+  }
+}

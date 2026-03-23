@@ -1,9 +1,11 @@
-/** * Path: components/dashboard/PendingInvites.tsx 
- * Description: Section for events where user hasn't responded or replied 'Maybe'. 
- * Removed hidden card filtering logic. */
+/**
+ * Path: apps/mobile/components/dashboard/PendingInvites.tsx
+ * Description: Pending invite cards driven by feed signals when available.
+ * Falls back to raw data only if signals are not passed.
+ */
 
 import React from 'react';
-import { View, StyleSheet, Text } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import PlanCard from '../../../../packages/ui/src/PlanCard';
 
@@ -11,6 +13,8 @@ interface PendingInvitesProps {
   data: {
     events: any[];
     rsvps: any[];
+    invites: any[];
+    chatSummaries?: Record<string, any>;
     userEmail: string;
   };
   theme: {
@@ -18,43 +22,58 @@ interface PendingInvitesProps {
     text: string;
   };
   onRefresh?: () => void;
+  signals?: any[];
 }
 
-export default function PendingInvites({ data, theme, onRefresh }: PendingInvitesProps) {
-  const { events, rsvps, userEmail } = data;
+export default function PendingInvites({
+  data,
+  theme,
+  onRefresh,
+  signals = [],
+}: PendingInvitesProps) {
+  const { events = [], rsvps = [], invites = [], chatSummaries = {}, userEmail = '' } = data;
   const router = useRouter();
-  
-  const emailLower = userEmail?.toLowerCase().trim();
 
-  // Find events that are pending or marked 'maybe'
-  const pendingList = events.filter((ev) => {
-    return rsvps.some((r) => {
-      const rsvpEmail = (r.email_lc || r.email || "").toLowerCase().trim();
-      const status = (r.status || "").toLowerCase().trim();
-      
-      return (
-        r.event_id === ev.id && 
-        rsvpEmail === emailLower && 
-        (status === '' || status === 'none' || status === 'invited' || status === 'pending' || status === 'maybe')
-      );
-    });
-  });
+  const emailLower = userEmail.toLowerCase().trim();
+
+  const pendingList =
+    signals.length > 0
+      ? signals.filter((s) => s.type === 'incoming_invite').map((s) => {
+          const event = events.find((ev) => ev.id === s.eventId);
+          return event || null;
+        }).filter(Boolean)
+      : events.filter((ev) => {
+          const invite = invites.find((i) => i.event_id === ev.id);
+          if (!invite) return false;
+
+          const userRsvp = rsvps.find(
+            (r) =>
+              r.event_id === ev.id &&
+              ((r.email_lc || r.email || '').toLowerCase().trim() === emailLower)
+          );
+
+          if (!userRsvp) return true;
+
+          const status = (userRsvp.status || '').toLowerCase().trim();
+
+          if (['yes', 'going', 'interested'].includes(status)) return false;
+
+          return status === 'maybe' || status === '' || status === 'pending';
+        });
 
   if (pendingList.length === 0) return null;
 
   return (
     <View style={styles.section}>
-      <Text style={[styles.label, { color: theme.label }]}>
-        Pending Invites
-      </Text>
-      
       {pendingList.map((ev: any) => {
-        // Find the specific status for this event to pass to the card
-        const userRsvp = rsvps.find(r => 
-          r.event_id === ev.id && 
-          (r.email_lc || r.email || "").toLowerCase().trim() === emailLower
+        const userRsvp = rsvps.find(
+          (r) =>
+            r.event_id === ev.id &&
+            ((r.email_lc || r.email || '').toLowerCase().trim() === emailLower)
         );
-        const currentStatus = userRsvp?.status?.toLowerCase().trim();
+
+        const currentStatus = (userRsvp?.status || '').toLowerCase().trim();
+        const chat = chatSummaries[ev.id] || null;
 
         return (
           <PlanCard
@@ -69,11 +88,13 @@ export default function PendingInvites({ data, theme, onRefresh }: PendingInvite
             gifKey={ev.gif_key}
             fontFamily={ev.font_family}
             hostName={ev.host_name || 'A Friend'}
-            actionLabel={currentStatus === 'maybe' ? "Update" : "RSVP"}
-            onPress={() => router.push(`/event/${ev.slug}` as any)}
+            actionLabel={currentStatus === 'maybe' ? 'Update' : 'RSVP'}
+            unreadMessages={chat?.unread_count || 0}
+            lastMessagePreview={chat?.last_message_body || null}
+            onPress={() => router.push(`/event/${ev.slug}/details` as any)}
             onRefresh={onRefresh}
             showPeek={true}
-            badge={currentStatus === 'maybe' ? "MAYBE" : undefined}
+            badge={currentStatus === 'maybe' ? 'MAYBE' : undefined}
           />
         );
       })}
@@ -82,12 +103,5 @@ export default function PendingInvites({ data, theme, onRefresh }: PendingInvite
 }
 
 const styles = StyleSheet.create({
-  section: { marginTop: 20 },
-  label: { 
-    fontSize: 13, 
-    fontWeight: 'bold', 
-    marginBottom: 10, 
-    textTransform: 'uppercase', 
-    paddingHorizontal: 16 
-  }
+  section: { marginTop: 4 },
 });

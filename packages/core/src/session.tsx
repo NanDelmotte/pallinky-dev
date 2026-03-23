@@ -1,64 +1,108 @@
-/** * Path: packages/core/src/session.tsx 
- * Description: Identity provider. Renamed to .tsx to support JSX.
- * This manages global state for the email and guest token.
+/**
+ * Path: packages/core/src/session.tsx
+ * Description: Shared session context for mobile flows using Supabase auth.
+ * App-member identity only. Does not persist guest RSVP email.
  */
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import * as SecureStore from 'expo-secure-store';
-import * as Crypto from 'expo-crypto';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { supabase } from './supabase';
 
-const GUEST_TOKEN_KEY = 'pallinky_guest_token';
-const USER_EMAIL_KEY = 'pallinky_user_email';
-
-interface SessionContextType {
-  userEmail: string | null;
-  guestToken: string | null;
-  signIn: (email: string) => Promise<void>;
+type SessionContextType = {
+  session: any;
   loading: boolean;
-}
+  userId: string | null;
+  userEmail: string | null;
+};
 
-const SessionContext = createContext<SessionContextType | undefined>(undefined);
+const SessionContext = createContext<SessionContextType | null>(null);
+
+function normalizeEmail(email?: string | null): string | null {
+  return email ? email.toLowerCase().trim() : null;
+}
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [guestToken, setGuestToken] = useState<string | null>(null);
+  const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   useEffect(() => {
-    async function initSession() {
-      try {
-        let token = await SecureStore.getItemAsync(GUEST_TOKEN_KEY);
-        if (!token) {
-          token = Crypto.randomUUID();
-          await SecureStore.setItemAsync(GUEST_TOKEN_KEY, token);
-        }
-        setGuestToken(token);
+    let mounted = true;
 
-        const email = await SecureStore.getItemAsync(USER_EMAIL_KEY);
-        setUserEmail(email);
-      } catch (e) {
-        console.error("Session Init Error:", e);
-      } finally {
+    const timeout = setTimeout(() => {
+      if (mounted) {
         setLoading(false);
       }
-    }
-    initSession();
+    }, 3000);
+
+    const syncSessionState = async (nextSession: any) => {
+      if (!mounted) return;
+
+      const nextUserId = nextSession?.user?.id ?? null;
+      const nextUserEmail = normalizeEmail(nextSession?.user?.email ?? null);
+
+      setSession(nextSession);
+      setUserId(nextUserId);
+      setUserEmail(nextUserEmail);
+      setLoading(false);
+      clearTimeout(timeout);
+    };
+
+    const initializeAuth = async () => {
+      try {
+        const {
+          data: { session: initialSession },
+          error,
+        } = await supabase.auth.getSession();
+
+        if (error) {
+          throw error;
+        }
+
+        await syncSessionState(initialSession);
+      } catch {
+        if (!mounted) return;
+        setSession(null);
+        setUserId(null);
+        setUserEmail(null);
+        setLoading(false);
+        clearTimeout(timeout);
+      }
+    };
+
+    void initializeAuth();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, currentSession) => {
+      await syncSessionState(currentSession);
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
-  const signIn = async (email: string) => {
-    const cleanEmail = email.toLowerCase().trim();
-    await SecureStore.setItemAsync(USER_EMAIL_KEY, cleanEmail);
-    setUserEmail(cleanEmail);
-  };
-
-  return (
-    <SessionContext.Provider value={{ userEmail, guestToken, signIn, loading }}>
-      {children}
-    </SessionContext.Provider>
+  const value = useMemo(
+    () => ({
+      session,
+      loading,
+      userId,
+      userEmail,
+    }),
+    [session, loading, userId, userEmail]
   );
+
+  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 
-export function useSession() {
+export const useSession = () => {
   const context = useContext(SessionContext);
-  if (!context) throw new Error('useSession must be used within a SessionProvider');
+
+  if (!context) {
+    return { session: null, loading: true, userId: null, userEmail: null };
+  }
+
   return context;
-}
+};

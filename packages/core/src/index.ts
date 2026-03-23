@@ -1,12 +1,15 @@
-/** * Path: packages/core/src/index.ts 
- * Description: Entry point for shared logic. 
- * Only exports universal logic to prevent Web build crashes from Mobile dependencies.
+/**
+ * Path: packages/core/src/index.ts
+ * Description: Shared core exports for Pallinky mobile/web packages.
+ * Note: Current auth/session implementation is mobile-oriented because it uses Expo SecureStore.
  */
 
-// Universal Exports (Safe for Web and Mobile)
 export * from './supabase';
+export * from './session';
 
-//Mobile-Only Exports (Commented out to allow Web build to pass)
-export * from './session'; 
-export * from './handle-link';
-export * from './auth';
+export * from './auth/useHostGate';
+
+export * from './events/createVibeDraft';
+export * from './events/getEventHostBySlug';
+
+export * from './invite/buildInviteMessage';

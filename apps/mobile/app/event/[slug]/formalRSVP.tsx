@@ -1,39 +1,78 @@
-/** * Path: app/event/[slug]/formalRSVP.tsx 
- * Description: Formal RSVP page for 'Seal a Deal' plans. 
- * Updated: Adjusted layout for better SafeAreaView notch clearance and improved visual hierarchy. */
+/**
+ * Path: app/event/[slug]/formalRSVP.tsx
+ * Description: Formal RSVP page for formal plans.
+ * Uses submit_rsvp for canonical participant writes and backend guest list for display.
+ * Approval-aware:
+ * - approval_required / host_approval / gated visibility shows Request to Join
+ * - canonical submit_rsvp may return pending_approval
+ */
 
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Alert, ScrollView, TouchableOpacity, Modal, TextInput, Image, SafeAreaView, Platform, Linking, StatusBar } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  Image,
+  Platform,
+  Linking,
+  StatusBar,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { supabase } from '@pallinky/core';
+import { supabase, useSession } from '@pallinky/core';
 import { CalendarButton } from '@pallinky/ui';
 import { Ionicons } from '@expo/vector-icons';
 
+const SYSTEM = {
+  background: '#F6F7F9',
+  surface: '#FFFFFF',
+  text: '#1f2a1b',
+  textMuted: '#66715f',
+  primary: '#43691b',
+  border: '#bac9ad',
+  borderSoft: '#e7ede2',
+  secondary: '#6A4C93',
+  secondaryBg: '#efe9f7',
+};
+
 const PALETTES: Record<string, { bg: string; accent: string; text: string; isDark: boolean }> = {
-  "zen": { bg: "#f8e9dc", accent: "#43691b", text: "#1f2a1b", isDark: false },
-  "girly": { bg: "#f4bbd3", accent: "#fe5d9f", text: "#2b1f24", isDark: false },
-  "fiesta": { bg: "#1729ae", accent: "#fe20e8", text: "#ffffff", isDark: true },
-  "classy": { bg: "#03172f", accent: "#efd466", text: "#fff7b6", isDark: true },
-  "spicy": { bg: "#656c12", accent: "#ecc216", text: "#ffffff", isDark: true },
+  zen: { bg: '#F6F7F9', accent: '#43691b', text: '#1f2a1b', isDark: false },
+  girly: { bg: '#f4bbd3', accent: '#fe5d9f', text: '#2b1f24', isDark: false },
+  fiesta: { bg: '#1729ae', accent: '#fe20e8', text: '#ffffff', isDark: true },
+  classy: { bg: '#03172f', accent: '#efd466', text: '#fff7b6', isDark: true },
+  spicy: { bg: '#656c12', accent: '#ecc216', text: '#ffffff', isDark: true },
 };
 
 const FONT_MAP: Record<string, string> = {
-  'Sans': Platform.OS === 'ios' ? 'Arial-BoldMT' : 'sans-serif-condensed',
-  'Serif': Platform.OS === 'ios' ? 'Times New Roman' : 'serif',
-  'Cursive': Platform.OS === 'ios' ? 'SnellRoundhand-Bold' : 'cursive',
-  'Gothic': Platform.OS === 'ios' ? 'Copperplate-Bold' : 'monospace'
+  Sans: Platform.OS === 'ios' ? 'Arial-BoldMT' : 'sans-serif-condensed',
+  Serif: Platform.OS === 'ios' ? 'Times New Roman' : 'serif',
+  Cursive: Platform.OS === 'ios' ? 'SnellRoundhand-Bold' : 'cursive',
+  Gothic: Platform.OS === 'ios' ? 'Copperplate-Bold' : 'monospace',
 };
+
+function normalizeEmail(value: string | null | undefined) {
+  return value?.toLowerCase().trim() || '';
+}
 
 export default function FormalRSVP() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const router = useRouter();
+  const { session, userEmail: sessionEmail } = useSession();
+
   const [loading, setLoading] = useState(true);
   const [event, setEvent] = useState<any>(null);
   const [guests, setGuests] = useState<any[]>([]);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [existingStatus, setExistingStatus] = useState<string | null>(null);
-  
+  const [hasPendingRequest, setHasPendingRequest] = useState(false);
+
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<'yes' | 'maybe' | 'no' | null>(null);
   const [guestName, setGuestName] = useState('');
@@ -41,242 +80,553 @@ export default function FormalRSVP() {
   const [confirmEmail, setConfirmEmail] = useState('');
   const [message, setMessage] = useState('');
 
-  const themeKey = event?.gif_key && PALETTES[event.gif_key] ? event.gif_key : "zen";
+  const themeKey = event?.gif_key && PALETTES[event.gif_key] ? event.gif_key : 'zen';
   const theme = PALETTES[themeKey];
-  const customFont = { fontFamily: FONT_MAP[event?.font_family] || (Platform.OS === 'ios' ? 'Arial-BoldMT' : 'sans-serif') };
-  
-  const badgeBg = theme.isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.06)';
-  const badgeText = theme.isDark ? '#ffffff' : '#333333';
+  const customFont = {
+    fontFamily:
+      FONT_MAP[event?.font_family] || (Platform.OS === 'ios' ? 'Arial-BoldMT' : 'sans-serif'),
+  };
+
+  const badgeBg = theme.isDark ? 'rgba(255,255,255,0.12)' : SYSTEM.surface;
+  const badgeText = theme.isDark ? '#ffffff' : theme.text;
 
   const hasLocationInDesc = event?.description?.includes('Location: ');
-  const displayDescription = hasLocationInDesc 
-    ? event.description.split('Location: ')[0].trim() 
+  const displayDescription = hasLocationInDesc
+    ? event.description.split('Location: ')[0].trim()
     : event?.description;
-  const locationText = hasLocationInDesc 
-    ? event.description.split('Location: ')[1].trim() 
+  const locationText = hasLocationInDesc
+    ? event.description.split('Location: ')[1].trim()
     : event?.location;
+
+  const requiresApproval =
+    event?.forwarding_mode === 'approval_required' ||
+    event?.forwarding_mode === 'host_approval';
+
+  const isPending = hasPendingRequest || existingStatus === 'pending';
 
   const openInMaps = () => {
     if (!locationText) return;
     const url = Platform.select({
       ios: `maps:0,0?q=${encodeURIComponent(locationText)}`,
-      android: `geo:0,0?q=${encodeURIComponent(locationText)}`
+      android: `geo:0,0?q=${encodeURIComponent(locationText)}`,
     });
     if (url) Linking.openURL(url);
   };
 
-  useEffect(() => { fetchData(); }, [slug]);
+  useEffect(() => {
+    void fetchData();
+  }, [slug, session?.user?.id, sessionEmail]);
 
   const fetchData = async () => {
+    setLoading(true);
+
     try {
-      const { data: eventData } = await supabase.from('events').select('*').eq('slug', slug).single();
+      const { data: eventData, error: eventError } = await supabase
+        .from('events')
+        .select('*')
+        .eq('slug', slug)
+        .single();
+
+      if (eventError) throw eventError;
       setEvent(eventData);
 
-      const savedEmail = await SecureStore.getItemAsync('pallinky_user_email');
-      if (savedEmail && eventData) {
-        const emailLower = savedEmail.toLowerCase().trim();
-        setUserEmail(emailLower);
-        setGuestEmail(emailLower);
-        setConfirmEmail(emailLower);
+      if (!eventData) {
+        setGuests([]);
+        return;
+      }
 
-        const { data: profile } = await supabase.from('profiles').select('display_name').eq('email_lc', emailLower).maybeSingle();
+      const rememberedGuestEmail = normalizeEmail(
+        await SecureStore.getItemAsync('pallinky_guest_email')
+      );
+
+      const effectiveEmail = normalizeEmail(sessionEmail) || rememberedGuestEmail || '';
+
+      if (effectiveEmail) {
+        setUserEmail(effectiveEmail);
+        setGuestEmail(effectiveEmail);
+        setConfirmEmail(effectiveEmail);
+
+        let profileName = '';
+        if (session?.user?.id) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', session.user.id)
+            .maybeSingle();
+
+          profileName = profile?.full_name || '';
+        }
+
         const { data: existingRsvp } = await supabase
           .from('rsvps')
           .select('id, status, name, message')
           .eq('event_id', eventData.id)
-          .eq('email_lc', emailLower)
+          .eq('email_lc', effectiveEmail)
           .maybeSingle();
 
-        const knownName = existingRsvp?.name || profile?.display_name || emailLower.split('@')[0];
+        const { data: pendingRequest } = await supabase
+          .from('rsvp_join_requests')
+          .select('id')
+          .eq('event_id', eventData.id)
+          .eq('requester_email', effectiveEmail)
+          .maybeSingle();
+
+        const knownName = existingRsvp?.name || profileName || effectiveEmail.split('@')[0];
+
         setGuestName(knownName);
-        
+        setHasPendingRequest(!!pendingRequest);
+
         if (existingRsvp?.status && existingRsvp.status !== 'pending') {
           setExistingStatus(existingRsvp.status);
           setSelectedStatus(existingRsvp.status);
           setMessage(existingRsvp.message || '');
+        } else {
+          setExistingStatus(null);
+          setSelectedStatus(null);
+          setMessage('');
         }
+      } else {
+        setUserEmail(null);
+        setGuestName('');
+        setGuestEmail('');
+        setConfirmEmail('');
+        setExistingStatus(null);
+        setSelectedStatus(null);
+        setMessage('');
+        setHasPendingRequest(false);
       }
 
-      const { data: guestData } = await supabase.rpc('get_guest_list', { p_slug: slug });
-      if (guestData) setGuests(guestData);
-    } catch (err) { 
-      console.error(err); 
-    } finally { 
-      setLoading(false); 
+      const { data: guestData, error: guestError } = await supabase.rpc('get_guest_list', {
+        p_slug: slug,
+        p_viewer_email: effectiveEmail || null,
+      });
+
+      if (guestError) throw guestError;
+      setGuests(guestData || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleSwitchUser = async () => {
+    await SecureStore.deleteItemAsync('pallinky_guest_email');
     setUserEmail(null);
     setGuestName('');
     setGuestEmail('');
     setConfirmEmail('');
     setExistingStatus(null);
+    setSelectedStatus(null);
+    setMessage('');
+    setHasPendingRequest(false);
   };
 
   const submitRSVP = async () => {
-    if (!guestName.trim() || !guestEmail.trim()) return Alert.alert("Wait", "Please enter your name and email.");
-    if (!userEmail && guestEmail.toLowerCase().trim() !== confirmEmail.toLowerCase().trim()) {
-      return Alert.alert("Check Email", "The emails don't match.");
+    const cleanGuestName = guestName.trim();
+    const cleanGuestEmail = normalizeEmail(guestEmail);
+    const cleanConfirmEmail = normalizeEmail(confirmEmail);
+
+    if (!selectedStatus) {
+      return Alert.alert('Wait', requiresApproval ? 'Please choose a response.' : 'Please choose Yes, Maybe, or No.');
     }
-    
+
+    if (!cleanGuestName || !cleanGuestEmail) {
+      return Alert.alert('Wait', 'Please enter your name and email.');
+    }
+
+    const isSignedInMember = !!normalizeEmail(sessionEmail);
+
+    if (!isSignedInMember && cleanGuestEmail !== cleanConfirmEmail) {
+      return Alert.alert('Check Email', "The emails don't match.");
+    }
+
     try {
-      const { error } = await supabase.rpc('submit_rsvp', {
-        p_slug: slug, p_name: guestName, p_email: guestEmail.toLowerCase().trim(),
-        p_status: selectedStatus, p_message: message.trim() || null
+      const { data, error } = await supabase.rpc('submit_rsvp', {
+        p_slug: slug,
+        p_name: cleanGuestName,
+        p_email: cleanGuestEmail,
+        p_status: selectedStatus,
+        p_message: message.trim() || null,
       });
+
       if (error) throw error;
-      
-      if (!userEmail) {
-        await SecureStore.setItemAsync('pallinky_user_email', guestEmail.toLowerCase().trim());
+      if (data?.error) throw new Error(data.error);
+
+      if (!isSignedInMember) {
+        await SecureStore.setItemAsync('pallinky_guest_email', cleanGuestEmail);
       }
 
+      const pendingApproval = data?.pending_approval === true;
+
       setModalVisible(false);
-      router.push({ 
-        pathname: `/event/${slug}/thanks` as any, 
-        params: { status: selectedStatus, theme: themeKey } 
+
+      if (pendingApproval) {
+        setHasPendingRequest(true);
+      }
+
+      router.push({
+        pathname: `/event/${slug}/thanks` as any,
+        params: {
+          status: pendingApproval ? 'pending' : selectedStatus,
+          theme: themeKey,
+        },
       });
-    } catch (err) { Alert.alert("Error", "Submission failed."); }
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Submission failed.');
+    }
   };
 
-  if (loading || !event) return <ActivityIndicator color={theme?.accent || "#000"} style={{ flex: 1, backgroundColor: theme?.bg || '#fff' }} />;
+  if (loading || !event) {
+    return (
+      <ActivityIndicator
+        color={theme?.accent || SYSTEM.primary}
+        style={{ flex: 1, backgroundColor: theme?.bg || SYSTEM.background }}
+      />
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.bg }]}>
-      <StatusBar barStyle={theme.isDark ? "light-content" : "dark-content"} />
-      
-      {/* Header Container for Notch Clearance */}
+      <StatusBar barStyle={theme.isDark ? 'light-content' : 'dark-content'} />
+
       <View style={styles.headerContainer}>
-        <TouchableOpacity 
-          style={[styles.backBtn, { backgroundColor: theme.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]} 
-          onPress={() => router.push('/(tabs)')} 
+        <TouchableOpacity
+          style={[
+            styles.backBtn,
+            {
+              backgroundColor: theme.isDark ? 'rgba(255,255,255,0.1)' : SYSTEM.surface,
+              borderColor: theme.isDark ? 'rgba(255,255,255,0.12)' : SYSTEM.borderSoft,
+            },
+          ]}
+          onPress={() => router.push(`/event/${slug}/details` as any)}
         >
           <Ionicons name="arrow-back" size={20} color={theme.text} />
-          <Text style={[styles.backBtnText, { color: theme.text }, customFont]}>Planning</Text>
+          <Text style={[styles.backBtnText, { color: theme.text }, customFont]}>Event</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        {event.cover_image_url && (
+        {event.cover_image_url ? (
           <View style={styles.imageWrapper}>
             <Image source={{ uri: event.cover_image_url }} style={styles.coverImage} />
           </View>
-        )}
-        
+        ) : null}
+
         <View style={styles.content}>
           <Text style={[styles.title, { color: theme.text }, customFont]}>{event.title}</Text>
-          <Text style={[styles.host, { color: theme.text, opacity: 0.7 }, customFont]}>Hosted by {event.host_name}</Text>
-          
+          <Text style={[styles.host, { color: theme.text, opacity: 0.7 }, customFont]}>
+            Hosted by {event.host_name}
+          </Text>
+
           <View style={styles.infoBox}>
             <Text style={[styles.infoText, { color: theme.text }, customFont]}>
-              {new Date(event.starts_at).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
+              {new Date(event.starts_at).toLocaleDateString(undefined, {
+                weekday: 'long',
+                month: 'short',
+                day: 'numeric',
+              })}
             </Text>
-            
-            {locationText && (
+
+            {locationText ? (
               <TouchableOpacity onPress={openInMaps} style={styles.locationLink}>
                 <Text style={[styles.infoText, { color: theme.accent, marginTop: 8 }, customFont]}>
                   📍 {locationText}
                 </Text>
-                <Text style={{ fontSize: 11, color: theme.accent, opacity: 0.8, marginLeft: 24, fontWeight: '700' }}>
-                  Open in Maps
-                </Text>
+                <Text style={[styles.mapsHint, { color: theme.accent }]}>Open in Maps</Text>
               </TouchableOpacity>
-            )}
-            
+            ) : null}
+
             <View style={{ marginTop: 15 }}>
               <CalendarButton event={event} theme={theme} />
             </View>
           </View>
 
-          {displayDescription && (
+          {displayDescription ? (
             <View style={styles.descriptionContainer}>
-               <Text style={[styles.descriptionText, { color: theme.text, opacity: 0.9 }, customFont]}>
+              <Text
+                style={[
+                  styles.descriptionText,
+                  { color: theme.text, opacity: 0.9 },
+                  customFont,
+                ]}
+              >
                 {displayDescription}
-               </Text>
+              </Text>
             </View>
-          )}
+          ) : null}
 
           <View style={styles.btnStack}>
-            {existingStatus ? (
-              <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.accent }]} onPress={() => setModalVisible(true)}>
+            {isPending ? (
+              <View style={[styles.primaryBtn, { backgroundColor: theme.accent, opacity: 0.6 }]}>
+                <Text style={[styles.primaryBtnText, { color: theme.bg }]}>Request Pending</Text>
+              </View>
+            ) : requiresApproval ? (
+              <TouchableOpacity
+                style={[styles.primaryBtn, { backgroundColor: theme.accent }]}
+                onPress={() => {
+                  setSelectedStatus('yes');
+                  setModalVisible(true);
+                }}
+              >
+                <Text style={[styles.primaryBtnText, { color: theme.bg }]}>Request to Join</Text>
+              </TouchableOpacity>
+            ) : existingStatus ? (
+              <TouchableOpacity
+                style={[styles.primaryBtn, { backgroundColor: theme.accent }]}
+                onPress={() => setModalVisible(true)}
+              >
                 <Text style={[styles.primaryBtnText, { color: theme.bg }]}>Change RSVP</Text>
               </TouchableOpacity>
             ) : (
               <>
-                <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.accent }]} onPress={() => { setSelectedStatus('yes'); setModalVisible(true); }}>
-                  <Text style={[styles.primaryBtnText, { color: theme.bg }]}>I'm Going</Text>
+                <TouchableOpacity
+                  style={[styles.primaryBtn, { backgroundColor: theme.accent }]}
+                  onPress={() => {
+                    setSelectedStatus('yes');
+                    setModalVisible(true);
+                  }}
+                >
+                  <Text style={[styles.primaryBtnText, { color: theme.bg }]}>I&apos;m Going</Text>
                 </TouchableOpacity>
+
                 <View style={styles.secondaryRow}>
-                  <TouchableOpacity style={[styles.secondaryBtn, { borderColor: theme.accent }]} onPress={() => { setSelectedStatus('maybe'); setModalVisible(true); }}>
+                  <TouchableOpacity
+                    style={[
+                      styles.secondaryBtn,
+                      {
+                        borderColor: theme.accent,
+                        backgroundColor: theme.isDark ? 'transparent' : SYSTEM.surface,
+                      },
+                    ]}
+                    onPress={() => {
+                      setSelectedStatus('maybe');
+                      setModalVisible(true);
+                    }}
+                  >
                     <Text style={[styles.secondaryBtnText, { color: theme.accent }]}>Maybe</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.secondaryBtn, { borderColor: theme.accent }]} onPress={() => { setSelectedStatus('no'); setModalVisible(true); }}>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.secondaryBtn,
+                      {
+                        borderColor: theme.accent,
+                        backgroundColor: theme.isDark ? 'transparent' : SYSTEM.surface,
+                      },
+                    ]}
+                    onPress={() => {
+                      setSelectedStatus('no');
+                      setModalVisible(true);
+                    }}
+                  >
                     <Text style={[styles.secondaryBtnText, { color: theme.accent }]}>No</Text>
-                  </TouchableOpacity>
+                  </TouchableOpacity> 
+                  
                 </View>
+                
               </>
             )}
           </View>
+          <TouchableOpacity
+            onPress={() => router.replace('/(tabs)/events')}
+            style={{ alignItems: 'center', marginTop: 2, marginBottom: 12 }}
+          >
+            <Text
+              style={{
+                color: theme.text,
+                opacity: 0.65,
+                
+                fontWeight: '600',
+              }}
+            >
+              Skip for now
+            </Text>
+          </TouchableOpacity>
+          <Text
+            style={[
+              styles.sectionTitle,
+              {
+                color: theme.text,
+                borderBottomColor: theme.isDark ? `${theme.accent}40` : SYSTEM.border,
+              },
+              customFont,
+            ]}
+          >
+            Guest List
+          </Text>
 
-          <Text style={[styles.sectionTitle, { color: theme.text, borderBottomColor: theme.accent + '30' }, customFont]}>Guest List</Text>
           <View style={styles.guestList}>
             {guests.map((guest, i) => (
-              <View key={i} style={[styles.guestCard, { backgroundColor: badgeBg }]}>
+              <View
+                key={i}
+                style={[
+                  styles.guestCard,
+                  {
+                    backgroundColor: badgeBg,
+                    borderColor: theme.isDark ? 'rgba(255,255,255,0.10)' : SYSTEM.borderSoft,
+                  },
+                ]}
+              >
                 <Text style={[styles.statusIcon, { color: badgeText }]}>
                   {guest.status === 'yes' ? '✓' : guest.status === 'maybe' ? '?' : '✕'}
                 </Text>
-                <Text style={[styles.guestName, { color: badgeText }, customFont]}>{guest.name?.split(' ')[0] || "Guest"}</Text>
+                <Text style={[styles.guestName, { color: badgeText }, customFont]}>
+                  {guest.name?.split(' ')[0] || 'Guest'}
+                </Text>
               </View>
             ))}
           </View>
         </View>
 
-        {/* Modal remains unchanged for logic, but inherits theme better */}
-        <Modal visible={modalVisible} animationType="slide" transparent={true}>
+        <Modal visible={modalVisible} animationType="slide" transparent>
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: theme.bg }]}>
-              <Text style={[styles.modalTitle, { color: theme.text }, customFont]}>RSVP</Text>
-              
+            <View
+              style={[
+                styles.modalContent,
+                {
+                  backgroundColor: theme.bg,
+                  borderTopColor: theme.isDark ? 'rgba(255,255,255,0.10)' : SYSTEM.border,
+                },
+              ]}
+            >
+              <Text style={[styles.modalTitle, { color: theme.text }, customFont]}>
+                {requiresApproval ? 'Request to Join' : 'RSVP'}
+              </Text>
+
               {!userEmail ? (
                 <>
-                  <TextInput style={[styles.input, { color: theme.text, borderColor: theme.accent + '30' }, customFont]} placeholder="Full Name" placeholderTextColor={theme.text + '50'} value={guestName} onChangeText={setGuestName} />
-                  <TextInput style={[styles.input, { color: theme.text, borderColor: theme.accent + '30' }]} placeholder="Email Address" placeholderTextColor={theme.text + '50'} value={guestEmail} onChangeText={setGuestEmail} keyboardType="email-address" autoCapitalize="none" />
-                  <TextInput style={[styles.input, { color: theme.text, borderColor: theme.accent + '30' }]} placeholder="Confirm Email" placeholderTextColor={theme.text + '50'} value={confirmEmail} onChangeText={setConfirmEmail} keyboardType="email-address" autoCapitalize="none" />
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        color: theme.text,
+                        borderColor: theme.isDark ? `${theme.accent}33` : SYSTEM.border,
+                        backgroundColor: theme.isDark ? 'rgba(255,255,255,0.05)' : SYSTEM.surface,
+                      },
+                      customFont,
+                    ]}
+                    placeholder="Full Name"
+                    placeholderTextColor={theme.text + '50'}
+                    value={guestName}
+                    onChangeText={setGuestName}
+                  />
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        color: theme.text,
+                        borderColor: theme.isDark ? `${theme.accent}33` : SYSTEM.border,
+                        backgroundColor: theme.isDark ? 'rgba(255,255,255,0.05)' : SYSTEM.surface,
+                      },
+                    ]}
+                    placeholder="Email Address"
+                    placeholderTextColor={theme.text + '50'}
+                    value={guestEmail}
+                    onChangeText={setGuestEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        color: theme.text,
+                        borderColor: theme.isDark ? `${theme.accent}33` : SYSTEM.border,
+                        backgroundColor: theme.isDark ? 'rgba(255,255,255,0.05)' : SYSTEM.surface,
+                      },
+                    ]}
+                    placeholder="Confirm Email"
+                    placeholderTextColor={theme.text + '50'}
+                    value={confirmEmail}
+                    onChangeText={setConfirmEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
                 </>
               ) : (
                 <View style={styles.knownUserBox}>
-                  <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start'}}>
+                  <View style={styles.knownUserHeader}>
                     <View>
-                      <Text style={[styles.knownUserText, { color: theme.text }, customFont]}>Going as {guestName}</Text>
-                      <Text style={[styles.knownUserSub, { color: theme.text, opacity: 0.6 }]}>{userEmail}</Text>
+                      <Text style={[styles.knownUserText, { color: theme.text }, customFont]}>
+                        {requiresApproval ? `Requesting as ${guestName}` : `Going as ${guestName}`}
+                      </Text>
+                      <Text style={[styles.knownUserSub, { color: theme.text, opacity: 0.6 }]}>
+                        {userEmail}
+                      </Text>
                     </View>
-                    <TouchableOpacity onPress={handleSwitchUser}>
-                      <Text style={{color: theme.accent, fontWeight: 'bold', fontSize: 12, textDecorationLine: 'underline'}}>Not you?</Text>
-                    </TouchableOpacity>
+
+                    {!sessionEmail ? (
+                      <TouchableOpacity onPress={handleSwitchUser}>
+                        <Text style={[styles.notYouText, { color: theme.accent }]}>Not you?</Text>
+                      </TouchableOpacity>
+                    ) : null}
                   </View>
                 </View>
               )}
 
-              <View style={styles.statusToggleRow}>
-                {(['yes', 'maybe', 'no'] as const).map((s) => (
-                  <TouchableOpacity 
-                    key={s} 
-                    onPress={() => setSelectedStatus(s)}
-                    style={[styles.statusTab, selectedStatus === s && { backgroundColor: theme.accent }]}
-                  >
-                    <Text style={[styles.statusTabText, { color: selectedStatus === s ? theme.bg : theme.text }]}>
-                      {s.toUpperCase()}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              
-              <TextInput style={[styles.input, { color: theme.text, borderColor: theme.accent + '30', height: 80 }]} placeholder="Note for the host..." placeholderTextColor={theme.text + '50'} value={message} onChangeText={setMessage} multiline />
-              <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: theme.accent, marginTop: 10 }]} onPress={submitRSVP}>
-                <Text style={[styles.primaryBtnText, { color: theme.bg }]}>Confirm {selectedStatus?.toUpperCase()}</Text>
+              {!requiresApproval ? (
+                <View style={styles.statusToggleRow}>
+                  {(['yes', 'maybe', 'no'] as const).map((s) => (
+                    <TouchableOpacity
+                      key={s}
+                      onPress={() => setSelectedStatus(s)}
+                      style={[
+                        styles.statusTab,
+                        {
+                          borderColor: theme.isDark ? `${theme.accent}33` : SYSTEM.border,
+                          backgroundColor:
+                            selectedStatus === s
+                              ? theme.accent
+                              : theme.isDark
+                                ? 'rgba(255,255,255,0.04)'
+                                : SYSTEM.surface,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.statusTabText,
+                          { color: selectedStatus === s ? theme.bg : theme.text },
+                        ]}
+                      >
+                        {s.toUpperCase()}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : null}
+
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    color: theme.text,
+                    borderColor: theme.isDark ? `${theme.accent}33` : SYSTEM.border,
+                    backgroundColor: theme.isDark ? 'rgba(255,255,255,0.05)' : SYSTEM.surface,
+                    height: 80,
+                  },
+                ]}
+                placeholder={requiresApproval ? 'Note for the host...' : 'Note for the host...'}
+                placeholderTextColor={theme.text + '50'}
+                value={message}
+                onChangeText={setMessage}
+                multiline
+              />
+
+              <TouchableOpacity
+                style={[styles.primaryBtn, { backgroundColor: theme.accent, marginTop: 10 }]}
+                onPress={submitRSVP}
+              >
+                <Text style={[styles.primaryBtnText, { color: theme.bg }]}>
+                  {requiresApproval
+                    ? 'Send Request'
+                    : `Confirm ${selectedStatus?.toUpperCase() || ''}`.trim()}
+                </Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setModalVisible(false)} style={{marginTop:25, alignItems:'center'}}>
-                <Text style={{color: theme.text, opacity: 0.6, fontWeight: '700'}}>Cancel</Text>
+
+              <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.cancelWrap}>
+                <Text style={{ color: theme.text, opacity: 0.6, fontWeight: '700' }}>Cancel</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -288,8 +638,21 @@ export default function FormalRSVP() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
-  headerContainer: { paddingHorizontal: 20, paddingTop: Platform.OS === 'android' ? 10 : 0, paddingBottom: 10 },
-  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20 },
+  headerContainer: {
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'android' ? 10 : 0,
+    paddingBottom: 10,
+  },
+  backBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
   backBtnText: { fontSize: 14, fontWeight: '700' },
   container: { flex: 1 },
   imageWrapper: { width: '100%', paddingHorizontal: 20, marginTop: 5 },
@@ -300,27 +663,88 @@ const styles = StyleSheet.create({
   infoBox: { marginBottom: 30 },
   infoText: { fontSize: 18, fontWeight: '600' },
   locationLink: { marginTop: 4, marginBottom: 5 },
+  mapsHint: {
+    fontSize: 11,
+    opacity: 0.8,
+    marginLeft: 24,
+    fontWeight: '700',
+  },
   descriptionContainer: { marginBottom: 35, padding: 5 },
   descriptionText: { fontSize: 17, lineHeight: 26 },
   btnStack: { gap: 10, marginBottom: 50 },
-  primaryBtn: { height: 60, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  primaryBtn: {
+    height: 60,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   primaryBtnText: { fontSize: 19, fontWeight: '800' },
   secondaryRow: { flexDirection: 'row', gap: 10 },
-  secondaryBtn: { flex: 1, height: 55, borderRadius: 16, borderWidth: 1.5, justifyContent: 'center', alignItems: 'center' },
+  secondaryBtn: {
+    flex: 1,
+    height: 55,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   secondaryBtnText: { fontSize: 15, fontWeight: '700' },
-  sectionTitle: { fontSize: 18, fontWeight: '800', marginBottom: 15, paddingBottom: 8, borderBottomWidth: 1 },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 15,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+  },
   guestList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 40 },
-  guestCard: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, alignItems: 'center' },
+  guestCard: {
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
   statusIcon: { fontSize: 13, fontWeight: '900', marginRight: 6 },
   guestName: { fontSize: 14, fontWeight: '600' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'flex-end' },
-  modalContent: { padding: 25, borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingBottom: 60 },
+  modalContent: {
+    padding: 25,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingBottom: 60,
+    borderTopWidth: 1,
+  },
   modalTitle: { fontSize: 24, fontWeight: '900', marginBottom: 20 },
-  input: { borderWidth: 1, borderRadius: 12, padding: 15, marginBottom: 12, fontSize: 16 },
+  input: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 12,
+    fontSize: 16,
+  },
   knownUserBox: { marginBottom: 20, paddingHorizontal: 5 },
+  knownUserHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
   knownUserText: { fontSize: 18, fontWeight: '800' },
   knownUserSub: { fontSize: 14, marginTop: 2 },
+  notYouText: {
+    fontWeight: 'bold',
+    fontSize: 12,
+    textDecorationLine: 'underline',
+  },
   statusToggleRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  statusTab: { flex: 1, height: 48, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(0,0,0,0.1)', justifyContent: 'center', alignItems: 'center' },
-  statusTabText: { fontSize: 12, fontWeight: 'bold' }
+  statusTab: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statusTabText: { fontSize: 12, fontWeight: 'bold' },
+  cancelWrap: { marginTop: 25, alignItems: 'center' },
 });

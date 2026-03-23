@@ -6,7 +6,9 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspace=apps/mobile"
+    "build": "npm run build --workspace=apps/mobile",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
   },
   "devDependencies": {
     "babel-plugin-module-resolver": "^5.0.2",
@@ -15,6 +17,8 @@
   },
   "dependencies": {
     "react": "19.1.0",
-    "react-native": "0.81.5"
-  }
+    "react-native": "0.81.5",
+    "expo": "~54.0.33"
+  },
+  "version": "1.0.0"
 }

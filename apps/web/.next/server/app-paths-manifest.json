@@ -1,7 +1,4 @@
 {
-  "/api/token-exchange/route": "app/api/token-exchange/route.js",
-  "/api/rsvp/route": "app/api/rsvp/route.js",
-  "/auth/callback/route": "app/auth/callback/route.js",
-  "/_not-found/page": "app/_not-found/page.js",
+  "/event/[slug]/thanks/page": "app/event/[slug]/thanks/page.js",
   "/event/[slug]/page": "app/event/[slug]/page.js"
 }

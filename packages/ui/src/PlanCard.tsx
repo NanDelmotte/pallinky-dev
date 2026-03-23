@@ -9,7 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@pallinky/core';
 
 const PALETTES: Record<string, { bg: string; accent: string; text: string; isDark: boolean }> = {
-  "zen": { bg: "#f8e9dc", accent: "#43691b", text: "#1f2a1b", isDark: false },
+  "zen": { bg: "#F6F7F9", accent: "#43691b", text: "#1f2a1b", isDark: false },
   "girly": { bg: "#f4bbd3", accent: "#fe5d9f", text: "#2b1f24", isDark: false },
   "fiesta": { bg: "#1729ae", accent: "#fe20e8", text: "#ffffff", isDark: true },
   "classy": { bg: "#03172f", accent: "#efd466", text: "#fff7b6", isDark: true },
@@ -37,6 +37,8 @@ interface PlanCardProps {
   status?: string; 
   actionLabel?: string;
   badge?: string;
+  unreadMessages?: number;
+  lastMessagePreview?: string | null;
   onPress?: () => void;
   onRefresh?: () => void;
   showPeek?: boolean;
@@ -60,6 +62,8 @@ const PlanCard = ({
   status,
   actionLabel,
   badge,
+  unreadMessages,
+  lastMessagePreview,
   onPress,
   onRefresh,
   showPeek,
@@ -89,9 +93,31 @@ const PlanCard = ({
           </StyledText>
           <StyledText style={[styles.titleText, { color: theme.text }, customFont]} numberOfLines={1}>{title}</StyledText>
           
-          {location && (
-            <StyledText style={[styles.locationText, { color: theme.text, opacity: 0.7 }]} numberOfLines={1}>📍 {location}</StyledText>
-          )}
+          {location ? (
+  <StyledText
+    style={[styles.locationText, { color: theme.text, opacity: 0.7 }]}
+    numberOfLines={1}
+  >
+    📍 {location}
+  </StyledText>
+) : null}
+
+{lastMessagePreview && (
+  <StyledText
+    style={[styles.chatPreviewText, { color: theme.text, opacity: 0.6 }]}
+    numberOfLines={1}
+  >
+    💬 {lastMessagePreview}
+  </StyledText>
+)}
+
+{(unreadMessages ?? 0) > 0 && (
+  <View style={styles.chatUnreadBadge}>
+    <StyledText style={styles.chatUnreadText}>
+      {unreadMessages}
+    </StyledText>
+  </View>
+)}
 
           <View style={styles.footer}>
             <StyledText style={[styles.hostText, { color: theme.text, opacity: 0.5 }]} numberOfLines={1}>By {hostName}</StyledText>
@@ -137,7 +163,31 @@ const styles = StyleSheet.create({
   statusBadgeText: { fontSize: 8, fontWeight: 'bold', textTransform: 'uppercase' },
   peekSection: { marginTop: 8, borderTopWidth: 1, paddingTop: 8 },
   peekButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 6, borderRadius: 10 },
-  peekButtonText: { fontSize: 12, fontWeight: '700' }
+  peekButtonText: { fontSize: 12, fontWeight: '700' },
+
+chatPreviewText: {
+  fontSize: 12,
+  marginTop: 3
+},
+
+chatUnreadBadge: {
+  position: 'absolute',
+  top: 10,
+  right: 10,
+  backgroundColor: '#ff3b30',
+  minWidth: 18,
+  height: 18,
+  borderRadius: 9,
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingHorizontal: 4
+},
+
+chatUnreadText: {
+  color: '#fff',
+  fontSize: 10,
+  fontWeight: '800'
+}
 });
 
 export default PlanCard;

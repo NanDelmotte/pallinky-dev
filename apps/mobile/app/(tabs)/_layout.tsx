@@ -1,6 +1,6 @@
 /** * Path: app/(tabs)/_layout.tsx 
- * Description: 4-tab layout updated to new strategy: Hub, Ideas, Launch, and Circles. 
- * Updated: Set active tint to blue-themed '#0077b6' and added 'waves' icon for Ideas. */
+ * Description: 4-tab layout. Guests are redirected here via Root Layout.
+ */
 
 import { Tabs } from 'expo-router';
 import React from 'react';
@@ -11,8 +11,10 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 export default function TabLayout() {
   return (
     <Tabs
+      // This ensures the logic stays on the tab the user was sent to
+      initialRouteName="index"
       screenOptions={{
-        tabBarActiveTintColor: '#0077b6', // Blue tint to match the new 'Fishing' branding
+        tabBarActiveTintColor: '#43691b',
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarStyle: Platform.select({
@@ -26,28 +28,28 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Hub',
+          title: 'Feed',
           tabBarIcon: ({ color }) => <Ionicons name="home-outline" size={24} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="ideas"
+        name="events"
         options={{
-          title: 'Ideas',
-          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="waves" size={24} color={color} />,
+          title: 'Events',
+          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="calendar" size={24} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="invite"
+        name="create"
         options={{
-          title: 'Launch',
+          title: 'Create',
           tabBarIcon: ({ color }) => <Ionicons name="rocket-outline" size={24} color={color} />,
         }}
       />
       <Tabs.Screen
-        name="circles"
+        name="people"
         options={{
-          title: 'Circles',
+          title: 'People',
           tabBarIcon: ({ color }) => <Ionicons name="people-outline" size={24} color={color} />,
         }}
       />

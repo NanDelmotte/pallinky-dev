@@ -29,7 +29,7 @@ export const Colors = {
 // NEW: Themes for the Index page sections
 export const DASHBOARD_THEMES: Record<string, any> = {
   classic: {
-    bg: '#f8e9dc',
+    bg: '#F6F7F9',
     cardBg: '#ffffff',
     text: '#1f2a1b',
     accent: '#43691b',

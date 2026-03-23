@@ -7,50 +7,86 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#f8e9dc"
+    "notification": {
+  "icon": "./assets/icon.png",
+  "color": "#ffffff"
+},
+   "splash": {
+  "image": "./assets/splash.png",
+  "resizeMode": "contain",
+  "backgroundColor": "#ffffff"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.nancy.pallinky",
-      "associatedDomains": ["applinks:501d9f7d-62c0-47d5-9747-011f79383a97.supabase.co"],
-      "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Pallinky uses your location to show you nearby bars, restaurants, and venues for your plans.",
-        "ITSAppUsesNonExemptEncryption": false,
-        "CFBundleURLTypes": [
-          {
-            "CFBundleURLSchemes": ["pallinky"]
-          }
+  "supportsTablet": true,
+  "bundleIdentifier": "com.nancy.pallinky",
+ "associatedDomains": [
+  "applinks:pallinky.com"
+  ],
+  "infoPlist": {
+    "NSLocationWhenInUseUsageDescription": "Pallinky uses your location to show you nearby bars, restaurants, and venues for your plans.",
+    "NSContactsUsageDescription": "Pallinky uses your contacts to help you quickly invite friends to your events.",
+    "NSUserNotificationsUsageDescription": "Pallinky sends notifications for invites, chat updates, and event changes.",
+    "ITSAppUsesNonExemptEncryption": false,
+    "CFBundleURLTypes": [
+      {
+        "CFBundleURLSchemes": [
+          "pallinky"
         ]
       }
-    },
+    ]
+  }
+},
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#f8e9dc"
+  "googleServicesFile": "./google-services.json",
+  "adaptiveIcon": {
+    "foregroundImage": "./assets/icon.png",
+    "backgroundColor": "#ffffff"
+  },
+  "package": "com.nancy.pallinky", 
+  "intentFilters": [
+  {
+    "action": "VIEW",
+    "autoVerify": true,
+    "data": [
+      {
+        "scheme": "https",
+        "host": "pallinky.com",
+        "pathPrefix": "/event"
       },
-      "package": "com.nancy.pallinky",
-      "intentFilters": [
-        {
-          "action": "VIEW",
-          "autoVerify": true,
-          "data": [
-            {
-              "scheme": "pallinky"
-            }
-          ],
-          "category": ["BROWSABLE", "DEFAULT"]
-        }
-      ],
-      "permissions": [
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
-      ]
+      {
+        "scheme": "https",
+        "host": "www.pallinky.com",
+        "pathPrefix": "/event"
+      }
+    ],
+    "category": [
+      "BROWSABLE",
+      "DEFAULT"
+    ]
+  },
+  {
+    "action": "VIEW",
+    "autoVerify": true,
+    "data": [
+      {
+        "scheme": "pallinky",
+        "host": "auth-callback"
+      }
+    ],
+    "category": [
+      "BROWSABLE",
+      "DEFAULT"
+    ]
+  }
+],
+     "permissions": [
+  "ACCESS_COARSE_LOCATION",
+  "ACCESS_FINE_LOCATION",
+  "POST_NOTIFICATIONS"
+]
     },
     "extra": {
       "eas": {
@@ -58,9 +94,7 @@
       }
     },
     "owner": "nanbowles",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/501d9f7d-62c0-47d5-9747-011f79383a97",
       "requestHeaders": {

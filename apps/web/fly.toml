@@ -1,8 +1,7 @@
 # Path: apps/web/fly.toml
-# Description: Deployment configuration for Fly.io.
 
 app = "pallinky-prod"
-primary_region = "ams" # Choose the region closest to you
+primary_region = "ams"
 
 [build]
   dockerfile = "Dockerfile"
@@ -10,11 +9,15 @@ primary_region = "ams" # Choose the region closest to you
 [http_service]
   internal_port = 3000
   force_https = true
-  auto_stop_machines = true
+  auto_stop_machines = false
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1
   processes = ["app"]
 
 [[vm]]
   size = "shared-cpu-1x"
   memory = "512mb"
+
+[metrics]
+  port = 9091
+  path = "/metrics"

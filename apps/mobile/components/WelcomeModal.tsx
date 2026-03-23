@@ -82,7 +82,7 @@ export default function WelcomeModal() {
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalContainer: { backgroundColor: '#f8e9dc', borderRadius: 24, padding: 30, width: '100%', alignItems: 'center' },
+  modalContainer: { backgroundColor: '#F6F7F9', borderRadius: 24, padding: 30, width: '100%', alignItems: 'center' },
   iconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
   title: { fontSize: 24, fontWeight: '900', color: '#1f2a1b', marginBottom: 15, textAlign: 'center' },
   body: { fontSize: 15, color: '#43691b', textAlign: 'center', marginBottom: 20, lineHeight: 22 },

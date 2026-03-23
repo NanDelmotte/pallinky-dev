@@ -1,3 +1,6 @@
+# Path: apps/mobile/fly.toml
+# Description: Deployment configuration for Fly.io.
+
 app = "pallinky-prod"
 primary_region = "ams"
 
