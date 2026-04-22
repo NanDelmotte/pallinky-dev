@@ -1,0 +1,4 @@
+{
+  "/event/[slug]/thanks/page": "app/event/[slug]/thanks/page.js",
+  "/event/[slug]/page": "app/event/[slug]/page.js"
+}
