@@ -124,17 +124,25 @@ export default function FishingRSVPScreen() {
         setAllVotes(votes);
 
         const cleanEmail = normalizeEmail(userEmail);
-        const myVote = votes.find((v) => normalizeEmail(v.user_email) === cleanEmail);
-
-        if (myVote) {
-          setSelectedDates(myVote.selected_dates || []);
-          setNote(myVote.note || '');
-        } else {
-          setSelectedDates([]);
-          setNote('');
-        }
 
         if (cleanEmail) {
+          const { data: myVote, error: myVoteError } = await supabase
+            .from('vibe_responses')
+            .select('user_email, selected_dates, note')
+            .eq('event_id', eventData.id)
+            .eq('user_email', cleanEmail)
+            .maybeSingle();
+
+          if (myVoteError) throw myVoteError;
+
+          if (myVote) {
+            setSelectedDates(myVote.selected_dates || []);
+            setNote(myVote.note || '');
+          } else {
+            setSelectedDates([]);
+            setNote('');
+          }
+
           const { data: pendingRequest } = await supabase
             .from('rsvp_join_requests')
             .select('id')
@@ -144,6 +152,8 @@ export default function FishingRSVPScreen() {
 
           setHasPendingRequest(!!pendingRequest);
         } else {
+          setSelectedDates([]);
+          setNote('');
           setHasPendingRequest(false);
         }
       } catch (e) {
