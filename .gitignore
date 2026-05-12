@@ -39,3 +39,7 @@ expo-env.d.ts
 .env
 .env.*
 !.env.example
+
+supabase/.temp/
+apps/mobile/supabase/.temp/
+supabase/prod_*.sql
