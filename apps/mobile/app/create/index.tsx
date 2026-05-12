@@ -171,7 +171,7 @@ const handleClose = () => {
   ) : <View />}
 </View>
 
-        <StyledText style={styles.title}>Good Times, Easy Plans</StyledText>
+        <StyledText style={styles.title}>Good times, made easy</StyledText>
         <StyledText style={styles.ambientLine}>{ambientLine}</StyledText>
 
         <View style={styles.grid}>

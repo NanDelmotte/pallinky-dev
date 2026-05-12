@@ -7,7 +7,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Pallinky',
-  description: 'Good Times, Easy Plans',
+  description: 'Good times, made easy',
 };
 
 export default function RootLayout({
