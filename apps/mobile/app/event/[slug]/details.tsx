@@ -230,12 +230,12 @@ export default function EventDetailsPage() {
       if (emails.length > 0) {
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('email, full_name')
-          .in('email', emails);
+          .select('email_lc, full_name')
+          .in('email_lc', emails);
 
         const map: Record<string, string> = {};
         (profiles || []).forEach((p: any) => {
-          const key = normalizeEmail(p.email);
+          const key = normalizeEmail(p.email_lc);
           if (key && p.full_name) map[key] = p.full_name;
         });
 
