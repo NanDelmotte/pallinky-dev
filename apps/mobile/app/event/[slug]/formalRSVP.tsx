@@ -171,7 +171,7 @@ export default function FormalRSVP() {
           .eq('requester_email', effectiveEmail)
           .maybeSingle();
 
-        const knownName = existingRsvp?.name || profileName || effectiveEmail.split('@')[0];
+        const knownName = profileName || existingRsvp?.name || effectiveEmail.split('@')[0];
 
         setGuestName(knownName);
         setHasPendingRequest(!!pendingRequest);
