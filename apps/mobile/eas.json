@@ -6,13 +6,8 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
-    },
-    "preview": {
       "distribution": "internal",
-      "android": {
-        "buildType": "apk"
-      }
+      "channel": "development"
     },
     "production": {
       "autoIncrement": true,
