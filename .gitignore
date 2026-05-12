@@ -23,3 +23,19 @@ apps/web/public/pallinky.apk
 
 *.apk
 apps/web/public/pallinky.apk
+
+node_modules/
+.pnp/
+.next/
+dist/
+build/
+.expo/
+expo-env.d.ts
+
+*.apk
+*.aab
+*.ipa
+
+.env
+.env.*
+!.env.example
