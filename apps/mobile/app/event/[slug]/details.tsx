@@ -106,15 +106,16 @@ export default function EventDetailsPage() {
     setLoading(true);
 
     try {
-      const { data: eventData, error: eventError } = await supabase
+      const { data: eventLookup, error: eventLookupError } = await supabase
         .from('events')
-        .select('*')
+        .select('id')
         .eq('slug', slug)
         .single();
 
-      if (eventError) throw eventError;
+      if (eventLookupError) throw eventLookupError;
 
-      if (!eventData) {
+      if (!eventLookup) {
+        setBlocked(false);
         setEvent(null);
         setSeriesEvents([]);
         setGuests([]);
@@ -127,7 +128,7 @@ export default function EventDetailsPage() {
       }
 
       const decision = await getEventAccessDecision({
-        eventId: String(eventData.id),
+        eventId: String(eventLookup.id),
         viewerEmail: viewerEmail || null,
       });
 
@@ -135,7 +136,30 @@ export default function EventDetailsPage() {
 
       if (decision.can_see !== true) {
         setBlocked(true);
-        setEvent(eventData);
+        setEvent(null);
+        setSeriesEvents([]);
+        setGuests([]);
+        setAllRsvps([]);
+        setPendingApprovals([]);
+        setProfileNamesByEmail({});
+        setMyRsvp(null);
+        setChatSummary(null);
+        return;
+      }
+
+      const { data: eventData, error: eventError } = await supabase
+        .from('events')
+        .select(
+          'id, slug, title, starts_at, event_type, manage_handle, series_id, host_email, gif_key, description, location, cover_image_url, host_name, proposed_dates'
+        )
+        .eq('id', eventLookup.id)
+        .single();
+
+      if (eventError) throw eventError;
+
+      if (!eventData) {
+        setBlocked(false);
+        setEvent(null);
         setSeriesEvents([]);
         setGuests([]);
         setAllRsvps([]);
@@ -162,7 +186,7 @@ export default function EventDetailsPage() {
 
       const [seriesRes, rsvpRes, guestListRes, pendingRes] = await Promise.all([
         seriesPromise,
-        supabase.from('rsvps').select('*').eq('event_id', eventData.id),
+        supabase.from('rsvps').select('email_lc, email, status').eq('event_id', eventData.id),
         supabase.rpc('get_guest_list', {
           p_slug: slug,
           p_viewer_email: viewerEmail || null,
@@ -170,7 +194,7 @@ export default function EventDetailsPage() {
         isHostViewer
           ? supabase
               .from('rsvp_join_requests')
-              .select('*')
+              .select('id, requester_email, email, requester_name, requested_status')
               .eq('event_id', eventData.id)
               .eq('status', 'pending')
               .order('created_at', { ascending: false })
