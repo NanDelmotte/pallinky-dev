@@ -5,6 +5,7 @@
 
 import React, { useEffect } from 'react';
 import { Platform } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Stack, useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
 import * as Device from 'expo-device';
@@ -240,8 +241,10 @@ void Linking.getInitialURL().then(async (url) => {
 
 export default function RootLayout() {
   return (
-    <SessionProvider>
-      <AppNavigator />
-    </SessionProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SessionProvider>
+        <AppNavigator />
+      </SessionProvider>
+    </GestureHandlerRootView>
   );
 }
