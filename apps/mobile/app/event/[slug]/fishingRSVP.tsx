@@ -191,7 +191,15 @@ export default function FishingRSVPScreen() {
 
     try {
       const cleanEmail = normalizeEmail(userEmail);
-      const guestName = cleanEmail.split('@')[0];
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('email_lc', cleanEmail)
+        .maybeSingle();
+
+      if (profileError) throw profileError;
+
+      const guestName = profile?.full_name || cleanEmail.split('@')[0];
 
       const { data, error } = await supabase.rpc('submit_vibe_rsvp', {
         p_slug: slug,
