@@ -2,7 +2,7 @@
  * Path: apps/mobile/app/auth/verify.tsx
  * Version: v18.43
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef,useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -19,6 +19,7 @@ import { StyledText } from '@pallinky/ui';
 import { Ionicons } from '@expo/vector-icons';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
+import Constants from 'expo-constants';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -40,7 +41,9 @@ export default function VerifyOTPScreen() {
 
   const [email, setEmail] = useState('');
   const [token, setToken] = useState('');
-  const [loading, setLoading] = useState(false);
+const [loading, setLoading] = useState(false);
+const [codeSent, setCodeSent] = useState(false);
+const oauthInProgressRef = useRef(false);
 
   const cleanEmail = useMemo(() => email.toLowerCase().trim(), [email]);
 
@@ -56,51 +59,108 @@ export default function VerifyOTPScreen() {
 
     return () => subscription.unsubscribe();
   }, [returnTo, router]);
+useEffect(() => {
+  const subscription = Linking.addEventListener('url', ({ url }) => {
+    console.log('[OAuth Linking] received url:', url);
+    console.log('[OAuth Linking] oauth in progress:', oauthInProgressRef.current);
+  });
 
-  const handleOAuthLogin = async (provider: 'apple' | 'google') => {
-    setLoading(true);
-    const redirectUrl = Linking.createURL('auth-callback');
-
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: redirectUrl,
-          skipBrowserRedirect: true,
-          queryParams:
-            provider === 'google'
-              ? {
-                  prompt: 'select_account',
-                }
-              : undefined,
-        },
-      });
-
-      if (error) throw error;
-
-      if (data?.url) {
-        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
-
-        if (result.type === 'success' && result.url) {
-          const hash = result.url.split('#')[1] ?? '';
-          const params = new URLSearchParams(hash);
-          const access_token = params.get('access_token');
-          const refresh_token = params.get('refresh_token');
-
-          if (access_token && refresh_token) {
-            await supabase.auth.setSession({
-              access_token,
-              refresh_token,
-            });
-          }
-        }
-      }
-    } catch (error: any) {
-      Alert.alert('Login Error', error.message);
-    } finally {
-      setLoading(false);
-    }
+  return () => {
+    subscription.remove();
   };
+}, []);
+  const handleOAuthLogin = async (provider: 'apple' | 'google') => {
+  setLoading(true);
+
+  const redirectUrl =
+  Constants.expoConfig?.extra?.appVariant === 'development'
+    ? 'pallinky-dev://auth-callback'
+    : 'pallinky://auth-callback';
+
+  console.log('[OAuth] provider:', provider);
+  console.log('[OAuth] redirectUrl:', redirectUrl);
+
+  try {
+    const beforeSession = await supabase.auth.getSession();
+    console.log('[OAuth] session before:', beforeSession.data.session);
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: redirectUrl,
+        skipBrowserRedirect: true,
+        queryParams:
+          provider === 'google'
+            ? {
+                prompt: 'select_account',
+              }
+            : undefined,
+      },
+    });
+
+    console.log('[OAuth] signInWithOAuth error:', error);
+    console.log('[OAuth] provider url:', data?.url);
+
+    if (error) throw error;
+    if (!data?.url) throw new Error('No OAuth URL returned.');
+
+    oauthInProgressRef.current = true;
+
+const result = await WebBrowser.openAuthSessionAsync(
+  data.url,
+  redirectUrl
+);
+
+    console.log('[OAuth] browser result:', JSON.stringify(result, null, 2));
+
+    if (result.type === 'success' && result.url) {
+      console.log('[OAuth] returned url:', result.url);
+
+      const url = new URL(result.url);
+      console.log('[OAuth] returned search:', url.search);
+      console.log('[OAuth] returned hash:', url.hash);
+
+      const code = url.searchParams.get('code');
+      const errorCode = url.searchParams.get('error');
+      const errorDescription = url.searchParams.get('error_description');
+
+      const hash = result.url.split('#')[1] ?? '';
+      const hashParams = new URLSearchParams(hash);
+      const access_token = hashParams.get('access_token');
+      const refresh_token = hashParams.get('refresh_token');
+
+      console.log('[OAuth] code exists:', Boolean(code));
+      console.log('[OAuth] error:', errorCode);
+      console.log('[OAuth] error_description:', errorDescription);
+      console.log('[OAuth] access_token exists:', Boolean(access_token));
+      console.log('[OAuth] refresh_token exists:', Boolean(refresh_token));
+
+      if (code) {
+        const exchange = await supabase.auth.exchangeCodeForSession(code);
+        console.log('[OAuth] exchange error:', exchange.error);
+        console.log('[OAuth] exchange session:', exchange.data?.session);
+      }
+
+      if (access_token && refresh_token) {
+        const setSession = await supabase.auth.setSession({
+          access_token,
+          refresh_token,
+        });
+        console.log('[OAuth] setSession error:', setSession.error);
+        console.log('[OAuth] setSession session:', setSession.data?.session);
+      }
+
+      const afterSession = await supabase.auth.getSession();
+      console.log('[OAuth] session after:', afterSession.data.session);
+    }
+  } catch (error: any) {
+    console.log('[OAuth] caught error:', error);
+    Alert.alert('Login Error', error.message ?? 'Could not complete login.');
+  } finally {
+  oauthInProgressRef.current = false;
+  setLoading(false);
+}
+};
 
   const handleRequestCode = async () => {
     if (!cleanEmail) {
@@ -126,14 +186,18 @@ try {
   const { error } = await supabase.auth.signInWithOtp({
     email: cleanEmail,
     options: {
-      emailRedirectTo: 'pallinky://auth-callback',
+      emailRedirectTo:
+  process.env.EXPO_PUBLIC_APP_VARIANT === 'development'
+    ? 'pallinky-dev://auth-callback'
+    : 'pallinky://auth-callback',
       shouldCreateUser: true,
     },
   });
 
   if (error) throw error;
 
-  Alert.alert('Code Sent', 'Check your email for the 6-digit code.');
+  setCodeSent(true);
+Alert.alert('Code Sent', 'Check your email for the 6-digit code.');
 } catch (error: any) {
   Alert.alert('Email Error', error.message);
 } finally {
@@ -185,7 +249,7 @@ try {
 
             <StyledText style={styles.title}>Identify Yourself</StyledText>
             <StyledText style={styles.subtitle}>
-              Sign in to save your event and continue.
+              Sign in to create an event or to see your events and groups. 
             </StyledText>
 
             <View style={styles.socialRow}>
@@ -208,43 +272,53 @@ try {
               )}
             </View>
 
-            <TextInput
-              style={styles.input}
-              placeholder="Enter your email"
-              placeholderTextColor={COLORS.textMuted}
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              returnKeyType="done"
-            />
+           {!codeSent ? (
+  <>
+    <TextInput
+      style={styles.input}
+      placeholder="Enter your email"
+      placeholderTextColor={COLORS.textMuted}
+      value={email}
+      onChangeText={setEmail}
+      autoCapitalize="none"
+      autoCorrect={false}
+      keyboardType="email-address"
+      returnKeyType="done"
+    />
 
-            <TouchableOpacity
-              style={styles.secondaryBtn}
-              onPress={handleRequestCode}
-              disabled={loading}
-            >
-              <StyledText style={styles.secondaryBtnText}>Send 6-digit code</StyledText>
-            </TouchableOpacity>
+    <TouchableOpacity
+      style={styles.secondaryBtn}
+      onPress={handleRequestCode}
+      disabled={loading}
+    >
+      <StyledText style={styles.secondaryBtnText}>
+        Send 6-digit code
+      </StyledText>
+    </TouchableOpacity>
+  </>
+) : (
+  <>
+    <TextInput
+      style={styles.input}
+      placeholder="Enter 6-digit code"
+      placeholderTextColor={COLORS.textMuted}
+      value={token}
+      onChangeText={setToken}
+      keyboardType="number-pad"
+      returnKeyType="done"
+    />
 
-            <TextInput
-              style={styles.input}
-              placeholder="Enter 6-digit code"
-              placeholderTextColor={COLORS.textMuted}
-              value={token}
-              onChangeText={setToken}
-              keyboardType="number-pad"
-              returnKeyType="done"
-            />
-
-            <TouchableOpacity
-              style={styles.primaryBtn}
-              onPress={handleVerifyCode}
-              disabled={loading}
-            >
-              <StyledText style={styles.primaryBtnText}>Verify and continue</StyledText>
-            </TouchableOpacity>
+    <TouchableOpacity
+      style={styles.primaryBtn}
+      onPress={handleVerifyCode}
+      disabled={loading}
+    >
+      <StyledText style={styles.primaryBtnText}>
+        Verify and continue
+      </StyledText>
+    </TouchableOpacity>
+  </>
+)}
           </View>
         </View>
       </ScrollView>
