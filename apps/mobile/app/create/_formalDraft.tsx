@@ -32,6 +32,8 @@ export type FormalDraftState = {
   rsvp_deadline: string | null;
   send_final_reminder_at_deadline: boolean;
   forwarding_mode: ForwardingMode;
+  visible_in_feed: boolean;
+  requires_approval: boolean;
 };
 
 export type FormalDraftPrefill = {
@@ -59,25 +61,30 @@ function buildInitialFormalDraft(
     : new Date();
 
   return {
-    title: prefill?.prefill_title || '',
-    whenMode: prefill?.prefill_date ? 'specific' : 'options',
-    specificDate: initialDate,
-    seriesDates: prefill?.prefill_date ? [initialDate] : [],
-    pollOptions: prefill?.prefill_date ? [] : [new Date()],
-    durationMins: null,
-    description: prefill?.prefill_desc || '',
-    location: '',
-    host_name: '',
-    host_email: '',
-    visibility: 3,
-    invite_list_visibility: 'host_only',
-    guest_list_visibility: 'guests_can_see',
-    send_rsvp_reminders: false,
-    remind_after_days: 3,
-    rsvp_deadline: null,
-    send_final_reminder_at_deadline: false,
-    forwarding_mode: null,
-  };
+  title: prefill?.prefill_title || '',
+  whenMode: prefill?.prefill_date ? 'specific' : 'options',
+  specificDate: initialDate,
+  seriesDates: prefill?.prefill_date ? [initialDate] : [],
+  pollOptions: prefill?.prefill_date ? [] : [new Date()],
+  durationMins: null,
+  description: prefill?.prefill_desc || '',
+  location: '',
+  host_name: '',
+  host_email: '',
+
+  visibility: 3,
+
+  visible_in_feed: true,
+  requires_approval: false,
+
+  invite_list_visibility: 'host_only',
+  guest_list_visibility: 'guests_can_see',
+  send_rsvp_reminders: false,
+  remind_after_days: 3,
+  rsvp_deadline: null,
+  send_final_reminder_at_deadline: false,
+  forwarding_mode: null,
+};
 }
 
 const FormalDraftContext = createContext<FormalDraftContextValue | null>(null);
