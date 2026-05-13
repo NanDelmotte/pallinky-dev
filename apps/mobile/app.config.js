@@ -6,7 +6,7 @@ const APP = {
   development: {
     name: 'Pallinky Dev',
     scheme: 'pallinky-dev',
-    icon: './assets/icon-dev.png',
+    icon: './assets/icon.png',
     androidIcon: './assets/android-dev.png',
   androidBackgroundColor: '#FE019A',
     iosBundleIdentifier: 'com.nancy.pallinky.dev',
