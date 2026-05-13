@@ -28,3 +28,4 @@ export function t(
 
   return text;
 }
+export type { AppLanguage, TranslationKey } from './types';

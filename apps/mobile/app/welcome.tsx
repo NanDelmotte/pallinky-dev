@@ -23,11 +23,11 @@ export default function WelcomeScreen() {
       <Text style={styles.title}>Pallinky</Text>
 
       <Text style={styles.body}>
-        This is one's woman's attempt to make group planning easier. 
-        {'\n'}
-        It’s kind of like social media for real life and helps us grow our social circles in a human way. 
-        {'\n'}
-        Let's be kind, go out and have fun.
+        Let's make group planning easier. 
+        {'\n'} {'\n'}
+       Pallinky is kind of like social media but for real life and helps us grow our social circles in a human way. 
+        {'\n'}{'\n'}
+        Life is better when we do interesting things, go out and have fun.
       </Text>
 
       <View style={styles.buttons}>
@@ -36,18 +36,18 @@ export default function WelcomeScreen() {
           onPress={() => complete('/auth/verify')}
         >
           <Text style={styles.primaryText}>
-            I’ve already used Pallinky
+            Come on in!
           </Text>
         </TouchableOpacity>
-
-        <TouchableOpacity
+ {/*         <TouchableOpacity
           style={styles.secondary}
-          onPress={() => complete('/create')}
+          onPress={() => complete('/create/startervideo')}
         >
           <Text style={styles.secondaryText}>
-            Create an event
+            I want to discover Pallinky
           </Text>
         </TouchableOpacity>
+*/}
 
        
       </View>

@@ -2,6 +2,27 @@
 
 export type FeedState = 'cold_start' | 'early_network' | 'mature_network';
 
+type RelationshipEntry = {
+  key: string;
+  personId?: string;
+  personEmail?: string;
+  sharedEvents: number;
+  hostedByYouCount: number;
+  hostedByThemCount: number;
+  sharedEventsActivity: Array<{
+    id: string;
+    title: string;
+    subtitle: string;
+    dateLabel: string;
+    detail: string;
+    type: 'shared_event';
+  }>;
+  lastSeenAt: string | null;
+  lastSeenAtMs: number | null;
+  lastSeenEventTitle?: string;
+  source: 'manual' | 'shared_event' | 'manual_and_shared_event';
+};
+
 export type FeedSignal =
   | 'upcoming_plan'
   | 'event_starting_soon'
@@ -240,17 +261,24 @@ export function deriveFeedSignals(input: {
     return ms === null || (ms >= now && ms <= now + fourteenDaysMs);
   });
 
-  const friendCount = circleMemberIdentityMap.size;
   const upcomingEventCount = upcomingEvents.length;
-  const networkActivityCount = invites.length + upcomingEventCount;
-  const hasImportedContacts = contacts.length > 0;
+const networkActivityCount = invites.length + upcomingEventCount;
+const hasImportedContacts = contacts.length > 0;
 
-  let feedState: FeedState = 'early_network';
-  if (!hasImportedContacts && friendCount === 0 && upcomingEventCount === 0) {
-    feedState = 'cold_start';
-  } else if (friendCount >= 5 || upcomingEventCount >= 3 || networkActivityCount >= 5) {
-    feedState = 'mature_network';
-  }
+// Temporary: before relationshipMap is built, manual directs are circle members.
+// Later in this file, directRelationshipCount becomes the real count.
+let directRelationshipCount = circleMemberIdentityMap.size;
+
+let feedState: FeedState = 'early_network';
+if (!hasImportedContacts && directRelationshipCount === 0 && upcomingEventCount === 0) {
+  feedState = 'cold_start';
+} else if (
+  directRelationshipCount >= 5 ||
+  upcomingEventCount >= 3 ||
+  networkActivityCount >= 5
+) {
+  feedState = 'mature_network';
+}
 
   const items: FeedItem[] = [];
 
@@ -299,7 +327,10 @@ export function deriveFeedSignals(input: {
     );
 
     const countsAsMine =
-      isHost || ['yes', 'going', 'interested', 'maybe', 'voted'].includes(status);
+  isHost ||
+  ['yes', 'going', 'interested', 'maybe', 'voted', 'pending', 'requested'].includes(
+    status
+  );
 
     if (countsAsMine) {
       items.push({
@@ -389,124 +420,57 @@ export function deriveFeedSignals(input: {
   }
 
   {
-    const candidateEvents = events.filter((ev: any) => {
-      const ms = eventStartMs(ev);
-      return ms === null || (ms >= now && ms <= now + fourteenDaysMs);
+    
+  const candidateEvents = events.filter((ev: any) => {
+    const ms = eventStartMs(ev);
+    return ms === null || (ms >= now && ms <= now + fourteenDaysMs);
+  });
+
+  for (const ev of candidateEvents) {
+    const evId = String(ev.id);
+
+    if (ev.visible_in_feed !== true) continue;
+
+    const hostIdentity = resolveIdentity({
+      person_id: ev.host_person_id,
+      host_email: ev.host_email,
+      email_lc: ev.host_email,
     });
 
-    for (const ev of candidateEvents) {
-      const evId = String(ev.id);
-      const hostIdentity = resolveIdentity({
-        person_id: ev.host_person_id,
-        host_email: ev.host_email,
-        email_lc: ev.host_email,
-      });
+    const isHost = isViewerIdentity(hostIdentity);
 
-      const hasSharedHistory =
-        !!hostIdentity.key &&
-        !isViewerIdentity(hostIdentity) &&
-        rsvps.some((r: any) => {
-          if (String(r.event_id) === evId) return false;
-          const rIdentity = resolveIdentity(r);
-          return sameIdentity(rIdentity, hostIdentity);
-        });
-
-      const viewerOwnsThisClassification =
-        isViewerIdentity(hostIdentity) ||
-        ['yes', 'going', 'interested', 'maybe', 'voted'].includes(
-          toEmailLc(
-            (participationByEventId.get(evId) || []).find((row: any) => {
-              const rowIdentity = resolveIdentity(row);
-              if (isViewerIdentity(rowIdentity)) return true;
-              return toEmailLc(row.email_lc || row.email) === userEmail;
-            })?._normalized_status
-          )
-        );
-
-      const qualifiesAsFriendCreator =
-        !viewerOwnsThisClassification &&
-        !!hostIdentity.key &&
-        !isViewerIdentity(hostIdentity) &&
-        (circleMemberIdentityMap.has(hostIdentity.key) ||
-          hasSharedHistory ||
-          (feedState === 'cold_start' && contactIdentityMap.has(hostIdentity.key)));
-
-      if (qualifiesAsFriendCreator) {
-        items.push({
-          id: `friend_created_event:${evId}:${stablePersonRef(hostIdentity)}`,
-          type: 'friend_created_event',
-          priority: 80,
-          eventId: evId,
-          ...makePersonFeedFields(hostIdentity),
-          payload: ev,
-        });
+    const userParticipation = (participationByEventId.get(evId) || []).find(
+      (row: any) => {
+        const rowIdentity = resolveIdentity(row);
+        if (isViewerIdentity(rowIdentity)) return true;
+        return toEmailLc(row.email_lc || row.email) === userEmail;
       }
+    );
 
-      const attendeeIdentityMap = new Map<string, FeedIdentity>();
-      for (const r of participationByEventId.get(evId) || []) {
-        const identity = resolveIdentity(r);
-        const attendeeStatus = toEmailLc(r._normalized_status ?? r.status);
-        if (!identity.key || isViewerIdentity(identity)) continue;
-        if (!isPositiveParticipationStatus(attendeeStatus)) continue;
-        attendeeIdentityMap.set(identity.key, identity);
-      }
+    const status = toEmailLc(
+      userParticipation?._normalized_status ?? userParticipation?.status
+    );
 
-      const friendNetwork =
-        feedState === 'cold_start' ? contactIdentityMap : circleMemberIdentityMap;
+    const countsAsMine =
+      isHost ||
+      ['yes', 'going', 'interested', 'maybe', 'voted', 'pending', 'requested'].includes(
+        status
+      );
 
-      const friendAttendee = viewerOwnsThisClassification
-        ? null
-        : Array.from(friendNetwork.values()).find((identity) => {
-            if (!identity.key || isViewerIdentity(identity)) return false;
+    if (countsAsMine) continue;
 
-            const attendee = attendeeIdentityMap.get(identity.key);
-            if (attendee) return true;
-
-            return Array.from(attendeeIdentityMap.values()).some((other) =>
-              sameIdentity(other, identity)
-            );
-          });
-
-      if (
-        !viewerOwnsThisClassification &&
-        friendAttendee?.key &&
-        !isViewerIdentity(friendAttendee) &&
-        !isViewerIdentity(hostIdentity)
-      ) {
-        items.push({
-          id: `friend_attending_event:${evId}:${stablePersonRef(friendAttendee)}`,
-          type: 'friend_attending_event',
-          priority: 70,
-          eventId: evId,
-          ...makePersonFeedFields(friendAttendee),
-          payload: ev,
-        });
-      }
-    }
+    items.push({
+      id: `friend_created_event:${evId}:${stablePersonRef(hostIdentity)}`,
+      type: 'friend_created_event',
+      priority: 80,
+      eventId: evId,
+      ...makePersonFeedFields(hostIdentity),
+      payload: ev,
+    });
   }
+}
 
-  const relationshipMap = new Map<
-    string,
-    {
-      key: string;
-      personId?: string;
-      personEmail?: string;
-      sharedEvents: number;
-      hostedByYouCount: number;
-      hostedByThemCount: number;
-      sharedEventsActivity: Array<{
-        id: string;
-        title: string;
-        subtitle: string;
-        dateLabel: string;
-        detail: string;
-        type: 'shared_event';
-      }>;
-      lastSeenAt: string | null;
-      lastSeenAtMs: number | null;
-      lastSeenEventTitle?: string;
-    }
-  >();
+  const relationshipMap = new Map<string, RelationshipEntry>();
 
   for (const ev of rawEvents) {
     if (accessByEventId[String(ev?.id)]?.can_see !== true) continue;
@@ -553,19 +517,19 @@ export function deriveFeedSignals(input: {
     }
 
     for (const identity of sharedPeople.values()) {
-      const existing = relationshipMap.get(identity.key!) || {
-        key: identity.key!,
-        personId: identity.personId,
-        personEmail: identity.personEmail,
-        sharedEvents: 0,
-        hostedByYouCount: 0,
-        hostedByThemCount: 0,
-        sharedEventsActivity: [],
-        lastSeenAt: null,
-        lastSeenAtMs: null,
-        lastSeenEventTitle: undefined,
-      };
-
+const existing = relationshipMap.get(identity.key!) || {
+  key: identity.key!,
+  personId: identity.personId,
+  personEmail: identity.personEmail,
+  sharedEvents: 0,
+  hostedByYouCount: 0,
+  hostedByThemCount: 0,
+  sharedEventsActivity: [],
+  lastSeenAt: null,
+  lastSeenAtMs: null,
+  lastSeenEventTitle: undefined,
+  source: 'shared_event',
+};
       existing.sharedEvents += 1;
 
       let detail = 'Shared event';
@@ -602,38 +566,53 @@ export function deriveFeedSignals(input: {
   for (const identity of circleMemberIdentityMap.values()) {
     if (!identity.key) continue;
     if (isViewerIdentity(identity)) continue;
-    if (relationshipMap.has(identity.key)) continue;
+   const existing = relationshipMap.get(identity.key);
 
-    relationshipMap.set(identity.key, {
-      key: identity.key,
-      personId: identity.personId,
-      personEmail: identity.personEmail,
-      sharedEvents: 0,
-      hostedByYouCount: 0,
-      hostedByThemCount: 0,
-      sharedEventsActivity: [],
-      lastSeenAt: null,
-      lastSeenAtMs: null,
-      lastSeenEventTitle: undefined,
-    });
+if (existing) {
+  existing.source =
+    existing.source === 'shared_event'
+      ? 'manual_and_shared_event'
+      : existing.source;
+
+  relationshipMap.set(identity.key, existing);
+  continue;
+}
+
+relationshipMap.set(identity.key, {
+  key: identity.key,
+  personId: identity.personId,
+  personEmail: identity.personEmail,
+  sharedEvents: 0,
+  hostedByYouCount: 0,
+  hostedByThemCount: 0,
+  sharedEventsActivity: [],
+  lastSeenAt: null,
+  lastSeenAtMs: null,
+  lastSeenEventTitle: undefined,
+  source: 'manual',
+});
   }
 
-  const relationshipEntries = Array.from(relationshipMap.values())
-    .filter((person) => {
-      const identity: FeedIdentity = {
-        key: person.key,
-        personId: person.personId,
-        personEmail: person.personEmail,
-      };
-      return !isViewerIdentity(identity);
-    })
-    .sort((a, b) => {
-      if (b.sharedEvents !== a.sharedEvents) return b.sharedEvents - a.sharedEvents;
-      const aMs = a.lastSeenAtMs ?? 0;
-      const bMs = b.lastSeenAtMs ?? 0;
-      return bMs - aMs;
-    });
+ const relationshipEntries = Array.from(relationshipMap.values())
+  .filter((person) => {
+    const identity: FeedIdentity = {
+      key: person.key,
+      personId: person.personId,
+      personEmail: person.personEmail,
+    };
 
+    return !isViewerIdentity(identity);
+  })
+  .sort((a, b) => {
+    if (b.sharedEvents !== a.sharedEvents) return b.sharedEvents - a.sharedEvents;
+
+    const aMs = a.lastSeenAtMs ?? 0;
+    const bMs = b.lastSeenAtMs ?? 0;
+
+    return bMs - aMs;
+  });
+
+directRelationshipCount = relationshipEntries.length;
   const innerCircleTopKeys = new Set(
     relationshipEntries.slice(0, 6).map((person) => person.key)
   );
@@ -997,26 +976,7 @@ export function deriveFeedSignals(input: {
     );
   }
 
-  for (const identity of matchedContactIdentityMap.values()) {
-    if (!identity.key) continue;
-    if (isViewerIdentity(identity)) continue;
-    if (isAlreadyDirectIdentity(identity)) continue;
-    if (hasSuggestedConnectionForIdentity(identity)) continue;
-
-    items.push({
-      id: `suggested_connection_contact:${stablePersonRef(identity)}`,
-      type: 'suggested_connection',
-      priority: 52,
-      personId: identity.personId,
-      personEmail: identity.personEmail,
-      payload: {
-        sharedEvents: 0,
-        lastSeenAt: null,
-        lastSeenEventTitle: 'in your contacts',
-        source: 'matched_contact',
-      },
-    });
-  }
+  
 
   const suggestedPeople = new Map<
     string,
@@ -1076,7 +1036,7 @@ export function deriveFeedSignals(input: {
     });
   }
 
-  if (!hasImportedContacts && friendCount < 5) {
+  if (!hasImportedContacts && directRelationshipCount < 5) {
     items.push({
       id: 'import_contacts_prompt',
       type: 'import_contacts_prompt',
@@ -1114,11 +1074,11 @@ for (const item of sortedItems) {
 return {
   feedState,
   meta: {
-    contactCount: input.deviceContactCount,
-    friendCount,
-    upcomingEventCount,
-    networkActivityCount,
-  },
+  contactCount: input.deviceContactCount,
+  friendCount: directRelationshipCount,
+  upcomingEventCount,
+  networkActivityCount,
+},
   items: uniqueEventItems,
 };
 }

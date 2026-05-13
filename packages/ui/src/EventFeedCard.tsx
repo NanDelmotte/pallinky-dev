@@ -9,6 +9,8 @@ import {
 } from 'react-native';
 import { StyledText } from './BaseComponents';
 import { Ionicons } from '@expo/vector-icons';
+import { t } from '@pallinky/i18n';
+import type { AppLanguage } from '@pallinky/i18n';
 
 const PALETTES: Record<
   string,
@@ -35,6 +37,7 @@ type ParticipantAvatar = {
 
 export interface EventFeedCardProps {
   id: string;
+  eventType?: string | null;
   title: string;
   startsAt: string;
   location?: string | null;
@@ -53,24 +56,36 @@ export interface EventFeedCardProps {
   participantSeeds?: string[];
   participantCount?: number;
   isSeries?: boolean;
+  lang?: AppLanguage;
   onPress?: () => void;
   onDismiss?: () => void;
 }
 
-function formatDateTime(startsAt: string) {
-  if (!startsAt) return 'Date TBD';
+function formatDateTime(startsAt: string, lang: AppLanguage) {
+  if (!startsAt) return t(lang, 'event_card_date_tbd');
 
   const date = new Date(startsAt);
-  const day = date.toLocaleDateString(undefined, { weekday: 'long' });
+
+  const weekday = date.toLocaleDateString(undefined, {
+    weekday: 'short',
+  });
+
+  const month = date.toLocaleDateString(undefined, {
+    month: 'short',
+  });
+
+  const dayNumber = date.getDate();
+
   const time = date.toLocaleTimeString(undefined, {
     hour: 'numeric',
     minute: '2-digit',
   });
 
-  return `${day} • ${time}`;
+  return `${weekday}. ${month} ${dayNumber} ${time}`;
 }
 
 const EventFeedCard = ({
+  eventType,
   title,
   startsAt,
   location,
@@ -88,6 +103,7 @@ const EventFeedCard = ({
   participantSeeds = [],
   participantCount = 0,
   isSeries = false,
+  lang = 'en',
   onPress,
   onDismiss,
 }: EventFeedCardProps) => {
@@ -106,18 +122,25 @@ const EventFeedCard = ({
   const normalizedHost = hostEmail?.toLowerCase().trim();
   const isHost = normalizedCurrentUser === normalizedHost;
 
-  const primaryActionLabel = actionLabel || (isHost ? 'Manage' : 'View Event');
+  const primaryActionLabel =
+  actionLabel || (isHost ? t(lang, 'common_manage') : t(lang, 'common_view_event'));
 
-  const baseBadgeLabel =
-    status?.toLowerCase() === 'past'
-      ? 'PAST'
-      : status?.toLowerCase() === 'host'
-      ? 'PLANNED'
-      : status?.toLowerCase() === 'pending'
-      ? 'PENDING'
-      : status?.toLowerCase() === 'guest'
-      ? 'JOINED'
-      : 'PLAN';
+  const isReachOut = eventType === 'reach_out';
+
+const baseBadgeLabel =
+  status?.toLowerCase() === 'past'
+    ? t(lang, 'event_card_badge_past')
+    : status?.toLowerCase() === 'host'
+    ? isReachOut
+      ? t(lang, 'event_card_badge_planning')
+      : t(lang, 'event_card_badge_planned')
+    : status?.toLowerCase() === 'pending'
+    ? t(lang, 'event_card_badge_pending')
+    : status?.toLowerCase() === 'guest'
+    ? isReachOut
+      ? t(lang, 'event_card_badge_planning')
+      : t(lang, 'event_card_badge_joined')
+    : t(lang, 'event_card_badge_plan');
 
   const normalizedParticipants: ParticipantAvatar[] =
     participantAvatars.length > 0
@@ -157,7 +180,9 @@ const EventFeedCard = ({
 
             {isSeries && (
               <View style={[styles.badge, styles.seriesBadge]}>
-                <StyledText style={styles.badgeText}>SERIES</StyledText>
+                <StyledText style={styles.badgeText}>
+  {t(lang, 'event_card_badge_series')}
+</StyledText>
               </View>
             )}
           </View>
@@ -197,12 +222,12 @@ const EventFeedCard = ({
 
             <StyledText style={styles.hostText} numberOfLines={1}>
               {status?.toLowerCase() === 'past'
-                ? isHost
-                  ? 'You organized'
-                  : `${hostName} organized`
-                : isHost
-                ? 'You are organizing'
-                : `${hostName} is organizing`}
+  ? isHost
+    ? t(lang, 'event_card_you_organized')
+    : t(lang, 'event_card_host_organized', { host: hostName })
+  : isHost
+  ? t(lang, 'event_card_you_are_organizing')
+  : t(lang, 'event_card_host_is_organizing', { host: hostName })}
             </StyledText>
           </View>
 
@@ -255,7 +280,7 @@ const EventFeedCard = ({
             <View style={styles.metaBlock}>
               <View style={styles.metaRow}>
                 <StyledText style={styles.metaText}>
-                  {formatDateTime(startsAt)}
+                  {formatDateTime(startsAt, lang)}
                 </StyledText>
               </View>
 

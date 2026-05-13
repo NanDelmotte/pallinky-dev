@@ -1,10 +1,10 @@
 /**
  * Path: apps/mobile/app/create/formal-when.tsx
- * Description: When step with all 4 options visible.
+ * Description: When step.
  * Specific = overlay modal
- * Series = overlay modal
  * Options = overlay modal
  * Not sure yet = straight to details
+ * Series = hidden behind "Repeat this event" inside Specific modal
  */
 
 import React, { useState } from 'react';
@@ -27,7 +27,6 @@ import DateTimePicker, {
 } from '@react-native-community/datetimepicker';
 
 import { StyledText } from '@pallinky/ui';
-
 import { useFormalDraft } from './_formalDraft';
 
 const COLORS = {
@@ -64,15 +63,36 @@ export default function FormalWhenScreen() {
     setShowSpecificModal(true);
   };
 
-  const openSeries = () => {
-    updateForm('whenMode', 'series');
+  const openSeriesFromSpecific = () => {
+    const seedDate = form.specificDate || tempDate || new Date();
+
+    setForm((prev) => {
+      const existingSeriesDates = prev.seriesDates || [];
+      const hasSeed = existingSeriesDates.some((d) => sameMinute(d, seedDate));
+
+      return {
+        ...prev,
+        whenMode: 'series',
+        specificDate: seedDate,
+        seriesDates: hasSeed
+          ? existingSeriesDates
+          : [...existingSeriesDates, seedDate].sort(
+              (a, b) => a.getTime() - b.getTime()
+            ),
+      };
+    });
+
+    setTempDate(seedDate);
     setShowPicker(false);
     setShowDurationDropdown(false);
+    setShowSpecificModal(false);
     setShowSeriesModal(true);
   };
 
   const openOptions = () => {
     updateForm('whenMode', 'options');
+    setShowPicker(false);
+    setShowDurationDropdown(false);
     setShowOptionsModal(true);
   };
 
@@ -90,6 +110,7 @@ export default function FormalWhenScreen() {
 
   const closeOptions = () => {
     setShowOptionsModal(false);
+    setShowPicker(false);
   };
 
   const onIOSChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
@@ -100,6 +121,7 @@ export default function FormalWhenScreen() {
     if (form.whenMode === 'series') {
       setForm((prev) => {
         if (prev.seriesDates.some((d) => sameMinute(d, tempDate))) return prev;
+
         return {
           ...prev,
           seriesDates: [...prev.seriesDates, tempDate].sort(
@@ -110,6 +132,7 @@ export default function FormalWhenScreen() {
     } else {
       updateForm('specificDate', tempDate);
     }
+
     setShowPicker(false);
   };
 
@@ -141,6 +164,7 @@ export default function FormalWhenScreen() {
                 if (form.whenMode === 'series') {
                   setForm((prev) => {
                     if (prev.seriesDates.some((d) => sameMinute(d, merged))) return prev;
+
                     return {
                       ...prev,
                       seriesDates: [...prev.seriesDates, merged].sort(
@@ -151,6 +175,7 @@ export default function FormalWhenScreen() {
                 } else if (form.whenMode === 'options') {
                   setForm((prev) => {
                     if (prev.pollOptions.some((d) => sameMinute(d, merged))) return prev;
+
                     return {
                       ...prev,
                       pollOptions: [...prev.pollOptions, merged].sort(
@@ -158,6 +183,7 @@ export default function FormalWhenScreen() {
                       ),
                     };
                   });
+
                   setTempDate(merged);
                 } else {
                   updateForm('specificDate', merged);
@@ -241,26 +267,13 @@ export default function FormalWhenScreen() {
             <TouchableOpacity
               style={[
                 styles.modeCard,
-                form.whenMode === 'series' && styles.modeCardSelected,
-              ]}
-              onPress={openSeries}
-            >
-              <StyledText style={styles.modeTitle}>A series of dates</StyledText>
-              <StyledText style={styles.modeSub}>
-                I already know multiple dates and want to create them all now.
-              </StyledText>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.modeCard,
                 form.whenMode === 'options' && styles.modeCardSelected,
               ]}
               onPress={openOptions}
             >
               <StyledText style={styles.modeTitle}>A few options</StyledText>
               <StyledText style={styles.modeSub}>
-                I want to suggest some dates and see.
+                I want to suggest some dates and let people choose.
               </StyledText>
             </TouchableOpacity>
 
@@ -302,10 +315,11 @@ export default function FormalWhenScreen() {
               <StyledText style={styles.stepTitle}>A specific time</StyledText>
 
               <StyledText style={styles.modeSub}>
-                I already know when this is happening.
+                Choose the date and time for this event.
               </StyledText>
 
               <StyledText style={styles.label}>START TIME</StyledText>
+
               <TouchableOpacity
                 style={styles.pwaInput}
                 onPress={() =>
@@ -320,6 +334,7 @@ export default function FormalWhenScreen() {
                     timeStyle: 'short',
                   })}
                 </StyledText>
+
                 <Ionicons
                   name={showPicker ? 'chevron-up' : 'chevron-down'}
                   size={18}
@@ -351,6 +366,7 @@ export default function FormalWhenScreen() {
               )}
 
               <StyledText style={styles.label}>DURATION</StyledText>
+
               <TouchableOpacity
                 style={styles.pwaInput}
                 onPress={() => setShowDurationDropdown((prev) => !prev)}
@@ -365,6 +381,7 @@ export default function FormalWhenScreen() {
                     ? `${Math.floor(form.durationMins / 60)}h ${form.durationMins % 60}m`
                     : 'No end time'}
                 </StyledText>
+
                 <Ionicons
                   name={showDurationDropdown ? 'chevron-up' : 'chevron-down'}
                   size={18}
@@ -400,10 +417,19 @@ export default function FormalWhenScreen() {
                 </View>
               )}
 
+              <TouchableOpacity style={styles.secondaryCard} onPress={openSeriesFromSpecific}>
+                <View style={{ flex: 1 }}>
+                  <StyledText style={styles.secondaryTitle}>Repeat this event</StyledText>
+                  <StyledText style={styles.secondarySub}>
+                    Create several sessions of the same event.
+                  </StyledText>
+                </View>
+
+                <Ionicons name="repeat" size={22} color={COLORS.primary} />
+              </TouchableOpacity>
+
               <TouchableOpacity onPress={continueSpecific}>
-                <StyledText style={{ color: COLORS.primary, fontWeight: '800', marginTop: 20 }}>
-                  Done
-                </StyledText>
+                <StyledText style={styles.doneText}>Done</StyledText>
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -426,24 +452,11 @@ export default function FormalWhenScreen() {
             </View>
 
             <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-              <StyledText style={styles.stepTitle}>A series of dates</StyledText>
+              <StyledText style={styles.stepTitle}>Repeat this event</StyledText>
 
               <StyledText style={styles.modeSub}>
-                I already know multiple dates and want to create them all now.
+                Add each session of the same event.
               </StyledText>
-
-              <StyledText style={styles.label}>DATES IN THE SERIES</StyledText>
-              <TouchableOpacity
-                style={styles.pwaInput}
-                onPress={() =>
-                  Platform.OS === 'android'
-                    ? showAndroidPicker()
-                    : openIOSPicker(new Date())
-                }
-              >
-                <StyledText style={styles.pwaInputText}>Add a date + time</StyledText>
-                <Ionicons name="add" size={18} color={COLORS.textMuted} />
-              </TouchableOpacity>
 
               {Platform.OS === 'ios' && showPicker && form.whenMode === 'series' && (
                 <>
@@ -468,9 +481,11 @@ export default function FormalWhenScreen() {
                 </>
               )}
 
-              {form.seriesDates.length > 0 && (
+              <StyledText style={styles.label}>SESSIONS</StyledText>
+
+              {form.seriesDates.length > 0 ? (
                 <View style={{ marginTop: 8 }}>
-                  {form.seriesDates.map((date) => {
+                  {form.seriesDates.map((date, index) => {
                     const key = date.toISOString();
 
                     return (
@@ -481,12 +496,27 @@ export default function FormalWhenScreen() {
                           { marginBottom: 10, paddingVertical: 14 },
                         ]}
                       >
-                        <StyledText style={[styles.pwaInputText, { flex: 1 }]}>
-                          {date.toLocaleString('en-GB', {
-                            dateStyle: 'medium',
-                            timeStyle: 'short',
-                          })}
-                        </StyledText>
+                        <View style={{ flex: 1 }}>
+                          <StyledText style={styles.sessionLabel}>
+                            Session {index + 1}
+                          </StyledText>
+
+                          <StyledText style={styles.sessionDate}>
+                            {date.toLocaleString('en-GB', {
+                              weekday: 'short',
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })}
+                          </StyledText>
+
+                          <StyledText style={styles.sessionTime}>
+                            {date.toLocaleString('en-GB', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </StyledText>
+                        </View>
 
                         <TouchableOpacity onPress={() => removeSeriesDate(date)}>
                           <Ionicons name="close-circle" size={22} color={COLORS.danger} />
@@ -495,9 +525,15 @@ export default function FormalWhenScreen() {
                     );
                   })}
                 </View>
+              ) : (
+                <StyledText style={{ color: COLORS.textMuted, marginTop: 8 }}>
+                  No sessions yet
+                </StyledText>
               )}
 
+              
               <StyledText style={styles.label}>DURATION</StyledText>
+
               <TouchableOpacity
                 style={styles.pwaInput}
                 onPress={() => setShowDurationDropdown((prev) => !prev)}
@@ -512,6 +548,7 @@ export default function FormalWhenScreen() {
                     ? `${Math.floor(form.durationMins / 60)}h ${form.durationMins % 60}m`
                     : 'No end time'}
                 </StyledText>
+
                 <Ionicons
                   name={showDurationDropdown ? 'chevron-up' : 'chevron-down'}
                   size={18}
@@ -546,11 +583,20 @@ export default function FormalWhenScreen() {
                   </TouchableOpacity>
                 </View>
               )}
+<TouchableOpacity
+                style={[styles.pwaInput, { marginTop: 12 }]}
+                onPress={() =>
+                  Platform.OS === 'android'
+                    ? showAndroidPicker()
+                    : openIOSPicker(new Date())
+                }
+              >
+                <StyledText style={styles.pwaInputText}>Add session</StyledText>
+                <Ionicons name="add" size={18} color={COLORS.textMuted} />
+              </TouchableOpacity>
 
               <TouchableOpacity onPress={continueSeries}>
-                <StyledText style={{ color: COLORS.primary, fontWeight: '800', marginTop: 20 }}>
-                  Done
-                </StyledText>
+                <StyledText style={styles.doneText}>Done</StyledText>
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -558,124 +604,130 @@ export default function FormalWhenScreen() {
       </Modal>
 
       <Modal
-  visible={showOptionsModal}
-  transparent
-  animationType="fade"
-  presentationStyle="overFullScreen"
-  onRequestClose={closeOptions}
->
-  <View style={styles.modalOverlayCenter}>
-    <View style={styles.overlayCard}>
-      <View style={styles.topBar}>
-        <TouchableOpacity onPress={closeOptions} style={styles.navIconBtn}>
-          <Ionicons name="close" size={28} color={COLORS.primary} />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <StyledText style={styles.stepTitle}>A few options</StyledText>
-
-        <StyledText style={styles.modeSub}>
-          I want to suggest some dates and see.
-        </StyledText>
-
-        <StyledText style={styles.label}>DATE OPTIONS</StyledText>
-
-<TouchableOpacity
-  style={styles.pwaInput}
-  onPress={() =>
-    Platform.OS === 'android'
-      ? showAndroidPicker()
-      : openIOSPicker(new Date())
-  }
->
-  <StyledText style={styles.pwaInputText}>Add a date + time</StyledText>
-  <Ionicons name="add" size={18} color={COLORS.textMuted} />
-</TouchableOpacity>
-
-{Platform.OS === 'ios' && showPicker && form.whenMode === 'options' && (
-  <>
-    <View style={styles.iosDeadlinePickerHeader}>
-      <TouchableOpacity onPress={() => setShowPicker(false)}>
-        <StyledText style={styles.iosCancelText}>Cancel</StyledText>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        onPress={() => {
-          setForm((prev) => {
-            if (prev.pollOptions.some((d) => d.getTime() === tempDate.getTime())) {
-              return prev;
-            }
-            return {
-              ...prev,
-              pollOptions: [...prev.pollOptions, tempDate].sort(
-                (a, b) => a.getTime() - b.getTime()
-              ),
-            };
-          });
-          setShowPicker(false);
-        }}
+        visible={showOptionsModal}
+        transparent
+        animationType="fade"
+        presentationStyle="overFullScreen"
+        onRequestClose={closeOptions}
       >
-        <StyledText style={styles.iosConfirmText}>Confirm</StyledText>
-      </TouchableOpacity>
-    </View>
+        <View style={styles.modalOverlayCenter}>
+          <View style={styles.overlayCard}>
+            <View style={styles.topBar}>
+              <TouchableOpacity onPress={closeOptions} style={styles.navIconBtn}>
+                <Ionicons name="close" size={28} color={COLORS.primary} />
+              </TouchableOpacity>
+            </View>
 
-    <DateTimePicker
-      value={tempDate}
-      mode="datetime"
-      display="spinner"
-      onChange={onIOSChange}
-      minuteInterval={15}
-      style={{ width: '100%' }}
-    />
-  </>
-)}
+            <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+              <StyledText style={styles.stepTitle}>A few options</StyledText>
 
-{form.pollOptions.length > 0 && (
-  <View style={{ marginTop: 8 }}>
-    {form.pollOptions.map((date) => {
-      const key = date.toISOString();
+              <StyledText style={styles.modeSub}>
+                Add possible dates so guests can choose what works.
+              </StyledText>
 
-      return (
-        <View
-          key={key}
-          style={[
-            styles.pwaInput,
-            { marginBottom: 10, paddingVertical: 14 },
-          ]}
-        >
-          <StyledText style={[styles.pwaInputText, { flex: 1 }]}>
-            {date.toLocaleString('en-GB', {
-              dateStyle: 'medium',
-              timeStyle: 'short',
-            })}
-          </StyledText>
+              <StyledText style={styles.label}>DATE OPTIONS</StyledText>
 
-          <TouchableOpacity
-            onPress={() =>
-              setForm((prev) => ({
-                ...prev,
-                pollOptions: prev.pollOptions.filter((d) => d.getTime() !== date.getTime()),
-              }))
-            }
-          >
-            <Ionicons name="close-circle" size={22} color={COLORS.danger} />
-          </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.pwaInput}
+                onPress={() =>
+                  Platform.OS === 'android'
+                    ? showAndroidPicker()
+                    : openIOSPicker(new Date())
+                }
+              >
+                <StyledText style={styles.pwaInputText}>Add a date option</StyledText>
+                <Ionicons name="add" size={18} color={COLORS.textMuted} />
+              </TouchableOpacity>
+
+              {Platform.OS === 'ios' && showPicker && form.whenMode === 'options' && (
+                <>
+                  <DateTimePicker
+                    value={tempDate}
+                    mode="datetime"
+                    display="spinner"
+                    onChange={onIOSChange}
+                    minuteInterval={15}
+                    style={{ width: '100%' }}
+                  />
+
+                  <View style={styles.iosPickerFooter}>
+                    <TouchableOpacity
+                      onPress={() => setShowPicker(false)}
+                      style={styles.iosFooterCancelBtn}
+                    >
+                      <StyledText style={styles.iosCancelText}>Cancel</StyledText>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.iosChooseBtn}
+                      onPress={() => {
+                        setForm((prev) => {
+                          if (prev.pollOptions.some((d) => d.getTime() === tempDate.getTime())) {
+                            return prev;
+                          }
+
+                          return {
+                            ...prev,
+                            pollOptions: [...prev.pollOptions, tempDate].sort(
+                              (a, b) => a.getTime() - b.getTime()
+                            ),
+                          };
+                        });
+
+                        setShowPicker(false);
+                      }}
+                    >
+                      <StyledText style={styles.iosChooseText}>Choose</StyledText>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+
+              {form.pollOptions.length > 0 && (
+                <View style={{ marginTop: 8 }}>
+                  {form.pollOptions.map((date) => {
+                    const key = date.toISOString();
+
+                    return (
+                      <View
+                        key={key}
+                        style={[
+                          styles.pwaInput,
+                          { marginBottom: 10, paddingVertical: 14 },
+                        ]}
+                      >
+                        <StyledText style={[styles.pwaInputText, { flex: 1 }]}>
+                          {date.toLocaleString('en-GB', {
+                            dateStyle: 'medium',
+                            timeStyle: 'short',
+                          })}
+                        </StyledText>
+
+                        <TouchableOpacity
+                          onPress={() =>
+                            setForm((prev) => ({
+                              ...prev,
+                              pollOptions: prev.pollOptions.filter(
+                                (d) => d.getTime() !== date.getTime()
+                              ),
+                            }))
+                          }
+                        >
+                          <Ionicons name="close-circle" size={22} color={COLORS.danger} />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+
+              <TouchableOpacity onPress={continueOptions}>
+                <StyledText style={styles.doneText}>Done</StyledText>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
         </View>
-      );
-    })}
-  </View>
-)}
-
-        <TouchableOpacity onPress={continueOptions}>
-          <StyledText style={{ color: COLORS.primary, fontWeight: '800', marginTop: 20 }}>
-            Done
-          </StyledText>
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
-  </View>
-</Modal>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -703,27 +755,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-durationDropdown: {
-  backgroundColor: COLORS.surface,
-  borderRadius: 12,
-  borderWidth: 1,
-  borderColor: COLORS.border,
-  marginTop: 8,
-  marginBottom: 8,
-  overflow: 'hidden',
-},
 
-durationOption: {
-  paddingVertical: 14,
-  paddingHorizontal: 16,
-  borderBottomWidth: 1,
-  borderBottomColor: COLORS.borderSoft,
-},
+  durationDropdown: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginTop: 8,
+    marginBottom: 8,
+    overflow: 'hidden',
+  },
 
-durationOptionText: {
-  fontSize: 16,
-  color: COLORS.text,
-},
+  durationOption: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderSoft,
+  },
+
+  durationOptionText: {
+    fontSize: 16,
+    color: COLORS.text,
+  },
+
   container: {
     padding: 25,
     paddingTop: 10,
@@ -774,6 +828,30 @@ durationOptionText: {
     color: COLORS.textMuted,
   },
 
+  secondaryCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fbfcfa',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.borderSoft,
+    marginTop: 14,
+  },
+
+  secondaryTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: COLORS.text,
+    marginBottom: 3,
+  },
+
+  secondarySub: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: COLORS.textMuted,
+  },
+
   pwaInput: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -796,21 +874,6 @@ durationOptionText: {
     color: COLORS.textMuted,
   },
 
-  nav: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 20,
-  },
-
-  btn: {
-    backgroundColor: COLORS.primary,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
   modalOverlayCenter: {
     flex: 1,
     backgroundColor: COLORS.overlay,
@@ -824,15 +887,6 @@ durationOptionText: {
     backgroundColor: COLORS.background,
     borderRadius: 24,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-
-  iosPickerModalCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 20,
-    padding: 16,
-    width: '88%',
     borderWidth: 1,
     borderColor: COLORS.border,
   },
@@ -853,58 +907,61 @@ durationOptionText: {
     fontWeight: '800',
   },
 
-  durationModalContent: {
-    backgroundColor: COLORS.surface,
-    padding: 25,
-    borderRadius: 20,
-    width: '80%',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-
-  durationModalLabel: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: COLORS.textMuted,
-    letterSpacing: 1,
-  },
-
-  durationInputRow: {
+  iosPickerFooter: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginVertical: 20,
-  },
-
-  inputGroup: {
     alignItems: 'center',
-  },
-
-  inlineFieldLabel: {
-    color: COLORS.text,
-  },
-
-  modalInput: {
-    borderBottomWidth: 2,
-    borderBottomColor: COLORS.primary,
-    fontSize: 32,
-    textAlign: 'center',
-    width: 60,
-    marginBottom: 5,
-    color: COLORS.text,
-  },
-
-  modalButtons: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 20,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderSoft,
   },
 
-  modalCancelText: {
-    color: COLORS.textMuted,
+  iosFooterCancelBtn: {
+    minHeight: 48,
+    justifyContent: 'center',
+    paddingHorizontal: 8,
   },
 
-  modalSetText: {
+  iosChooseBtn: {
+    minHeight: 48,
+    borderRadius: 14,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 22,
+  },
+
+  iosChooseText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+
+  doneText: {
     color: COLORS.primary,
     fontWeight: '800',
+    marginTop: 20,
   },
+  sessionLabel: {
+  fontSize: 12,
+  fontWeight: '900',
+  color: COLORS.textMuted,
+  letterSpacing: 0.8,
+  textTransform: 'uppercase',
+  marginBottom: 4,
+},
+
+sessionDate: {
+  fontSize: 18,
+  fontWeight: '800',
+  color: COLORS.text,
+  marginBottom: 2,
+},
+
+sessionTime: {
+  fontSize: 16,
+  fontWeight: '700',
+  color: COLORS.textMuted,
+},
 });

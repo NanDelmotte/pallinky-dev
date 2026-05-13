@@ -167,18 +167,15 @@ export default function ManageEventScreen() {
       return;
     }
 
-    if (!cancelMessage.trim()) {
-      Alert.alert('Missing Info', 'Please add a short message for your guests.');
-      return;
-    }
+
 
     setIsCancelling(true);
 
     try {
-      const payload = {
-        p_manage_token: safeToken,
-        p_message: cancelMessage.trim(),
-      };
+  const payload = {
+  p_manage_token: safeToken,
+  p_message: cancelMessage.trim() || null,
+};
 
       console.log('cancel_event_by_manage_token payload', payload);
 
@@ -558,18 +555,18 @@ export default function ManageEventScreen() {
                     />
 
                     <TouchableOpacity
-                      style={[
-                        styles.cancelBtn,
-                        (!cancelMessage.trim() || isCancelling) && styles.disabledBtn,
-                      ]}
-                      onPress={handleCancelEvent}
-                      disabled={!cancelMessage.trim() || isCancelling}
-                    >
+  style={[
+    styles.cancelBtn,
+    isCancelling && styles.disabledBtn,
+  ]}
+  onPress={handleCancelEvent}
+  disabled={isCancelling}
+>
                       {isCancelling ? (
                         <ActivityIndicator color="#fff" />
                       ) : (
                         <>
-                          <StyledText style={styles.sendBtnText}>Cancel Event</StyledText>
+                         <StyledText style={styles.sendBtnText}>Cancel Event</StyledText>
                           <Ionicons name="close-circle" size={18} color="#fff" />
                         </>
                       )}
@@ -644,7 +641,7 @@ const styles = StyleSheet.create({
   cancelActionText: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#1a1a1a',
+    color: '#FF3B30',
   },
 
   statsRow: {
