@@ -366,7 +366,7 @@ export default function PollPage() {
           {isHost && !!event.manage_handle && (
             <TouchableOpacity
               style={[styles.manageLink, { borderColor: theme.accent }]}
-              onPress={() => router.push(`/m/${event.manage_handle}/edit` as any)}
+              onPress={() => router.push(`/m/${event.manage_handle}/` as any)}
             >
               <Ionicons name="create-outline" size={16} color={theme.accent} />
               <Text style={[styles.manageLinkText, { color: theme.accent }]}>

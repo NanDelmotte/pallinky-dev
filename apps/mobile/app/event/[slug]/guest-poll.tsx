@@ -337,12 +337,14 @@ export default function GuestPollPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
-  const [note, setNote] = useState('');
+const [notThisTime, setNotThisTime] = useState(false);
+const [note, setNote] = useState('');
   const [hasPendingRequest, setHasPendingRequest] = useState(false);
   const [profileNamesByEmail, setProfileNamesByEmail] = useState<Record<string, string>>({});
   const [profileAvatarsByEmail, setProfileAvatarsByEmail] = useState<Record<string, string>>({});
   const [openingDmForEmail, setOpeningDmForEmail] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table');
+  
 
   const nameColumnScrollRef = useRef<ScrollView | null>(null);
 const gridScrollRef = useRef<ScrollView | null>(null);
@@ -439,8 +441,18 @@ const syncingGridHorizontalRef = useRef(false);
             thread_id: String(data),
           },
         } as any);
-      } catch (err) {
-        console.error(err);
+      } catch (err: any) {
+        const message = String(err?.message || '');
+
+        if (message.includes('blocked_user_interaction')) {
+          Alert.alert(
+            'Messaging unavailable',
+            'You can no longer message this user.'
+          );
+          return;
+        }
+
+        console.log('Unable to open message', err);
         Alert.alert('Unable to open message');
       } finally {
         setOpeningDmForEmail(null);
@@ -490,12 +502,15 @@ const syncingGridHorizontalRef = useRef(false);
       const myVote = votes.find((v) => normalizeEmail(v.user_email) === cleanViewerEmail);
 
       if (myVote) {
-        setSelectedDates(myVote.selected_dates || []);
-        setNote(myVote.note || '');
-      } else {
-        setSelectedDates([]);
-        setNote('');
-      }
+  const nextSelectedDates = myVote.selected_dates || [];
+  setSelectedDates(nextSelectedDates);
+  setNotThisTime(nextSelectedDates.length === 0);
+  setNote(myVote.note || '');
+} else {
+  setSelectedDates([]);
+  setNotThisTime(false);
+  setNote('');
+}
 
       if (cleanViewerEmail) {
         const { data: pendingRequest } = await supabase
@@ -734,9 +749,11 @@ const syncingGridHorizontalRef = useRef(false);
     (dateIso: string) => {
       if (hasPendingRequest) return;
 
-      setSelectedDates((prev) =>
-        prev.includes(dateIso) ? prev.filter((d) => d !== dateIso) : [...prev, dateIso]
-      );
+      setNotThisTime(false);
+
+setSelectedDates((prev) =>
+  prev.includes(dateIso) ? prev.filter((d) => d !== dateIso) : [...prev, dateIso]
+);
     },
     [hasPendingRequest]
   );
@@ -749,10 +766,7 @@ const syncingGridHorizontalRef = useRef(false);
 
     if (hasPendingRequest) return;
 
-    if ((event?.proposed_dates || []).length > 0 && selectedDates.length === 0) {
-      Alert.alert('Pick a date', 'Please select at least one date.');
-      return;
-    }
+ 
 
     setSubmitting(true);
 
@@ -769,9 +783,9 @@ const syncingGridHorizontalRef = useRef(false);
         p_slug: slug,
         p_user_email: cleanViewerEmail,
         p_guest_name: guestName,
-        p_selected_dates: selectedDates,
-        p_note: note.trim() || null,
-        p_status: 'interested',
+        p_selected_dates: notThisTime ? [] : selectedDates,
+p_note: note.trim() || null,
+p_status: notThisTime ? 'no' : 'interested',
       });
 
       if (error) throw error;
@@ -1423,7 +1437,31 @@ const syncingGridHorizontalRef = useRef(false);
               </View>
             </View>
           ) : null}
-
+<TouchableOpacity
+  style={[
+    styles.notThisTimeCard,
+    {
+      borderColor: notThisTime ? theme.accent : theme.isDark ? 'rgba(255,255,255,0.10)' : SYSTEM.borderSoft,
+      backgroundColor: notThisTime
+        ? `${theme.accent}14`
+        : theme.isDark
+        ? 'rgba(255,255,255,0.06)'
+        : SYSTEM.surface,
+    },
+  ]}
+  onPress={() => {
+    setNotThisTime((prev) => !prev);
+    setSelectedDates([]);
+  }}
+  disabled={hasPendingRequest}
+>
+  <Ionicons
+    name={notThisTime ? 'checkbox-outline' : 'square-outline'}
+    size={22}
+    color={notThisTime ? theme.accent : theme.textMuted}
+  />
+  <Text style={[styles.notThisTimeText, { color: theme.text }]}>Not this time</Text>
+</TouchableOpacity>
           <View style={styles.noteSection}>
             <Text style={[styles.sectionLabel, { color: theme.text, opacity: 0.62 }, customFont]}>
               Optional note
@@ -1726,11 +1764,7 @@ calendarDayNumber: {
     borderBottomWidth: 1,
   },
 
-  ttableBodyWrap: {
-  flexDirection: 'row',
-  maxHeight: 420,
-  alignItems: 'flex-start',
-},
+  
 
   tableFrozenColumn: {
   borderRightWidth: 1,
@@ -1742,13 +1776,7 @@ calendarDayNumber: {
     flexDirection: 'row',
   },
 
-  mmatrixNameHeaderCell: {
-  justifyContent: 'center',
-  paddingHorizontal: 12,
-  minHeight: 86,
-  borderRightWidth: 1,
-  overflow: 'hidden',
-},
+ 
 
   matrixNameHeaderText: {
     fontSize: 12,
@@ -1954,7 +1982,21 @@ calendarLeadingText: {
   noteSection: {
     marginBottom: 28,
   },
+notThisTimeCard: {
+  minHeight: 54,
+  borderRadius: 16,
+  borderWidth: 1,
+  paddingHorizontal: 14,
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 10,
+  marginBottom: 18,
+},
 
+notThisTimeText: {
+  fontSize: 16,
+  fontWeight: '800',
+},
   noteInput: {
     borderRadius: 16,
     padding: 16,

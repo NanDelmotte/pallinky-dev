@@ -245,8 +245,7 @@ await Share.share({ message });
               </TouchableOpacity>
             </View>
 
-            {isPublicEvent && (
-              <View style={styles.shareCard}>
+            <View style={styles.shareCard}>
                 <StyledText style={styles.label}>Personal Pitch</StyledText>
 
                 <TextInput
@@ -277,8 +276,8 @@ await Share.share({ message });
                   </TouchableOpacity>
                 </View>
               </View>
-            )}
-
+        
+{/*
             <TouchableOpacity style={styles.circlesCard} onPress={() => requireHost('circles')}>
               <View style={[styles.studioIcon, { backgroundColor: COLORS.secondary }]}>
                 <Ionicons name="people" size={24} color="#fff" />
@@ -297,7 +296,7 @@ await Share.share({ message });
                 color={COLORS.secondary}
               />
             </TouchableOpacity>
-
+*/}
             {isPublicEvent ? (
               <View style={styles.qrCard}>
                 <Image source={{ uri: qrImageUri }} style={styles.qrImage} />

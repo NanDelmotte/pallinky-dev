@@ -49,6 +49,7 @@ interface PredictedFriend {
 interface ProfileAvatarRow {
   id: string;
   email_lc: string | null;
+  full_name: string | null;
   avatar_url: string | null;
 }
 
@@ -253,7 +254,9 @@ export default function CircleSharePickerScreen() {
     ): UnifiedPerson[] => {
       const personMap = new Map<string, UnifiedPerson>();
       const profileAvatarByEmail = new Map<string, string>();
-      const profileAvatarById = new Map<string, string>();
+const profileAvatarById = new Map<string, string>();
+const profileNameByEmail = new Map<string, string>();
+const profileNameById = new Map<string, string>();
 
       const hiddenEmailSet = new Set(
         hiddenRows.map((row) => normalizeEmail(row.email_lc)).filter(Boolean),
@@ -266,12 +269,16 @@ export default function CircleSharePickerScreen() {
       );
 
       profileRows.forEach((profile) => {
-        const email = normalizeEmail(profile.email_lc);
-        const avatar = profile.avatar_url?.trim() || '';
+  const email = normalizeEmail(profile.email_lc);
+  const avatar = profile.avatar_url?.trim() || '';
+  const fullName = profile.full_name?.trim() || '';
 
-        if (email && avatar) profileAvatarByEmail.set(email, avatar);
-        if (profile.id && avatar) profileAvatarById.set(profile.id, avatar);
-      });
+  if (email && avatar) profileAvatarByEmail.set(email, avatar);
+  if (profile.id && avatar) profileAvatarById.set(profile.id, avatar);
+
+  if (email && fullName) profileNameByEmail.set(email, fullName);
+  if (profile.id && fullName) profileNameById.set(profile.id, fullName);
+});
 
       predictedFriends
         .filter((friend) => {
@@ -286,7 +293,7 @@ export default function CircleSharePickerScreen() {
             key: `email:${email}`,
             selection_id: getSelectionId({ email_lc: email }),
             email_lc: email,
-            name: friend.name?.trim() || emailToFallbackName(email),
+            name: profileNameByEmail.get(email) || friend.name?.trim() || emailToFallbackName(email),
             avatar_url: profileAvatarByEmail.get(email) || friend.avatar_url || null,
             source: 'pallinky',
             total_hangouts: friend.total_hangouts || 0,
@@ -301,7 +308,7 @@ export default function CircleSharePickerScreen() {
         .filter((contact) => {
           const cleanEmail = normalizeEmail(contact.email_lc);
           const cleanPhone = normalizePhone(contact.phone_e164);
-          const matchedId = contact.matched_user_id || contact.matched_profile_id || '';
+          const matchedId = contact.matched_user_id || contact.matched_user_id || '';
           const isSelf = cleanEmail !== '' && cleanEmail === userEmail;
 
           if (isSelf) return false;
@@ -317,9 +324,9 @@ export default function CircleSharePickerScreen() {
           const phone = normalizePhone(contact.phone_e164) || null;
           if (!email && !phone) return;
 
-          const looksLikeUser = Boolean(
-            contact.is_user || contact.matched_user_id || contact.matched_profile_id,
-          );
+         const looksLikeUser = Boolean(
+  contact.is_user || contact.matched_user_id || profileNameByEmail.has(email || ''),
+);
 
           const existing = email ? personMap.get(`email:${email}`) : null;
 
@@ -339,14 +346,18 @@ export default function CircleSharePickerScreen() {
               selection_id: mergedSelectionId,
               email_lc: mergedEmail,
               name:
-                contact.display_name?.trim() ||
-                contact.name?.trim() ||
-                existing.name ||
-                (mergedEmail
-                  ? emailToFallbackName(mergedEmail)
-                  : phoneToFallbackName(mergedPhone || '')),
+  profileNameById.get(contact.matched_user_id || '') ||
+  (mergedEmail ? profileNameByEmail.get(mergedEmail) : '') ||
+  contact.display_name?.trim() ||
+  contact.name?.trim() ||
+  existing.name ||
+  (mergedEmail
+    ? emailToFallbackName(mergedEmail)
+    : phoneToFallbackName(mergedPhone || '')),
+  
+   
               avatar_url:
-                profileAvatarById.get(contact.matched_user_id || contact.matched_profile_id || '') ||
+                profileAvatarById.get(contact.matched_user_id || contact.matched_user_id || '') ||
                 (mergedEmail ? profileAvatarByEmail.get(mergedEmail) : null) ||
                 existing.avatar_url ||
                 contact.avatar_url ||
@@ -357,7 +368,7 @@ export default function CircleSharePickerScreen() {
               device_contact_id: mergedDeviceContactId,
               phone_e164: mergedPhone,
               matched_user_id:
-                contact.matched_user_id || contact.matched_profile_id || existing.matched_user_id,
+                contact.matched_user_id || contact.matched_user_id || existing.matched_user_id,
               person_id: contact.person_id || existing.person_id,
             });
             return;
@@ -382,11 +393,13 @@ export default function CircleSharePickerScreen() {
             selection_id: selectionId,
             email_lc: email,
             name:
-              contact.display_name?.trim() ||
-              contact.name?.trim() ||
-              (email ? emailToFallbackName(email) : phoneToFallbackName(phone || '')),
+  profileNameById.get(contact.matched_user_id || '') ||
+  (email ? profileNameByEmail.get(email) : '') ||
+  contact.display_name?.trim() ||
+  contact.name?.trim() ||
+  (email ? emailToFallbackName(email) : phoneToFallbackName(phone || '')),
             avatar_url:
-              profileAvatarById.get(contact.matched_user_id || contact.matched_profile_id || '') ||
+              profileAvatarById.get(contact.matched_user_id || contact.matched_user_id || '') ||
               (email ? profileAvatarByEmail.get(email) : null) ||
               contact.avatar_url ||
               contact.avatar_uri ||
@@ -395,7 +408,7 @@ export default function CircleSharePickerScreen() {
             total_hangouts: 0,
             device_contact_id: contact.device_contact_id || null,
             phone_e164: phone,
-            matched_user_id: contact.matched_user_id || contact.matched_profile_id || null,
+            matched_user_id: contact.matched_user_id || contact.matched_user_id || null,
             person_id: contact.person_id || null,
           });
         });
@@ -435,11 +448,7 @@ export default function CircleSharePickerScreen() {
           .select('id, circle_name, created_at')
           .eq('user_id', nextUserId)
           .order('created_at', { ascending: false }),
-        supabase
-          .from('predicted_circles')
-          .select('name, email_lc, total_hangouts, avatar_url')
-          .neq('email_lc', userEmail)
-          .order('total_hangouts', { ascending: false }),
+ Promise.resolve({ data: [], error: null }), 
         supabase.rpc('get_my_device_contacts'),
       ]);
 
@@ -470,15 +479,14 @@ export default function CircleSharePickerScreen() {
 
       deviceContacts.forEach((contact) => {
         const email = normalizeEmail(contact.email_lc);
-        const matchedId = contact.matched_user_id || contact.matched_profile_id || '';
+        const matchedId = contact.matched_user_id || contact.matched_user_id || '';
         if (email) profileEmailSet.add(email);
         if (matchedId) profileIdSet.add(matchedId);
       });
 
       let profileRows: ProfileAvatarRow[] = [];
       if (profileEmailSet.size || profileIdSet.size) {
-        let profileQuery = supabase.from('profiles').select('id, email_lc, avatar_url');
-
+        let profileQuery = supabase.from('profiles').select('id, email_lc, full_name, avatar_url');
         if (profileEmailSet.size && profileIdSet.size) {
           profileQuery = profileQuery.or(
             `email_lc.in.(${Array.from(profileEmailSet).join(',')}),id.in.(${Array.from(profileIdSet).join(',')})`,
@@ -1274,7 +1282,7 @@ export default function CircleSharePickerScreen() {
                 <View style={styles.sectionCardHeaderRow}>
                   <StyledText style={styles.sectionTitle}>My People</StyledText>
 
-                  <TouchableOpacity
+              <TouchableOpacity
                     style={styles.addPeopleButton}
                     onPress={openChooseRawContacts}
                     disabled={addingPeople}
@@ -1286,6 +1294,7 @@ export default function CircleSharePickerScreen() {
                       color={addingPeople ? COLORS.textMuted : COLORS.primary}
                     />
                   </TouchableOpacity>
+                
                 </View>
 
                 {filteredPeople.length === 0 ? (

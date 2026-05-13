@@ -109,7 +109,14 @@ function getRsvpLabel(status: string | null | undefined) {
 
   return 'Invited';
 }
+function getSeriesIndex(seriesEvents: any[], currentEventId: string) {
+  const sorted = [...seriesEvents]
+    .filter(e => !!e.starts_at)
+    .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
 
+  const index = sorted.findIndex(e => e.id === currentEventId);
+  return index >= 0 ? index + 1 : null;
+}
 function HostHeaderSection({
   theme,
   hostAvatarUrl,
@@ -261,37 +268,108 @@ function EventInfoSection({
 function PollDatesSection({
   theme,
   proposedDates,
+  pollResponses,
 }: {
   theme: Theme;
   proposedDates: string[];
+  pollResponses: any[];
 }) {
   if (!proposedDates?.length) return null;
 
+  const results = proposedDates
+    .map((dateValue: string) => {
+      const voters = (pollResponses || []).filter((response: any) =>
+        Array.isArray(response.selected_dates) &&
+        response.selected_dates.includes(dateValue)
+      );
+
+      return {
+        dateValue,
+        voters,
+        voteCount: voters.length,
+      };
+    })
+    .sort((a, b) => b.voteCount - a.voteCount);
+
+  const topVoteCount = results[0]?.voteCount || 0;
+
   return (
     <View style={styles.pollContainer}>
-      <Text style={[styles.sectionTitle, { color: theme.text }]}>Suggested Dates</Text>
+      <Text style={[styles.sectionTitle, { color: theme.text }]}>Poll results</Text>
 
-      <View style={styles.dateGrid}>
-        {proposedDates.map((d: string, i: number) => (
-          <View
-            key={i}
-            style={[
-              styles.dateChip,
-              {
-                backgroundColor: theme.isDark ? 'rgba(255,255,255,0.08)' : SYSTEM.surface,
-                borderColor: theme.isDark ? 'rgba(255,255,255,0.10)' : SYSTEM.borderSoft,
-              },
-            ]}
-          >
-            <Text style={styles.dateChipText}>
-              {new Date(d).toLocaleDateString(undefined, {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-              })}
-            </Text>
-          </View>
-        ))}
+      <View style={styles.pollResultsList}>
+        {results.map((result) => {
+          const isMostPopular = result.voteCount > 0 && result.voteCount === topVoteCount;
+
+          return (
+            <View
+              key={result.dateValue}
+              style={[
+                styles.pollResultCard,
+                {
+                  backgroundColor: theme.isDark ? 'rgba(255,255,255,0.08)' : SYSTEM.surface,
+                  borderColor: isMostPopular ? theme.accent : SYSTEM.borderSoft,
+                },
+              ]}
+            >
+              <View style={styles.pollResultHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.pollResultDate, { color: theme.text }]}>
+                    {new Date(result.dateValue).toLocaleDateString(undefined, {
+                      weekday: 'short',
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </Text>
+
+                  <Text style={[styles.pollResultTime, { color: theme.text }]}>
+                    {new Date(result.dateValue).toLocaleTimeString(undefined, {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })}
+                  </Text>
+                </View>
+
+                <View
+                  style={[
+                    styles.pollVoteBadge,
+                    { backgroundColor: isMostPopular ? theme.accent : SYSTEM.borderSoft },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.pollVoteBadgeText,
+                      { color: isMostPopular ? '#fff' : SYSTEM.text },
+                    ]}
+                  >
+                    {result.voteCount}
+                  </Text>
+                </View>
+              </View>
+
+              {isMostPopular ? (
+                <Text style={[styles.pollPopularLabel, { color: theme.accent }]}>
+                  Most popular
+                </Text>
+              ) : null}
+
+              <View style={styles.pollVoterList}>
+                {result.voters.length > 0 ? (
+                  result.voters.map((voter: any, index: number) => (
+                    <Text
+                      key={`${result.dateValue}-${voter.id || voter.user_email || index}`}
+                      style={[styles.pollVoterName, { color: theme.text }]}
+                    >
+                      {voter.guest_name || voter.user_email?.split('@')[0] || 'Guest'}
+                    </Text>
+                  ))
+                ) : (
+                  <Text style={[styles.pollNoVotes, { color: theme.text }]}>No votes yet</Text>
+                )}
+              </View>
+            </View>
+          );
+        })}
       </View>
     </View>
   );
@@ -404,7 +482,8 @@ export default function EventDetailsPage() {
   const [approvalsOpen, setApprovalsOpen] = useState(false);
   const [resolvingRequestId, setResolvingRequestId] = useState<string | null>(null);
   const [allRsvps, setAllRsvps] = useState<any[]>([]);
-  const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
+const [pollResponses, setPollResponses] = useState<any[]>([]);
+const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
   const [profileNamesByEmail, setProfileNamesByEmail] = useState<Record<string, string>>({});
   const [profileAvatarsByEmail, setProfileAvatarsByEmail] = useState<Record<string, string>>({});
   const [hostAvatarUrl, setHostAvatarUrl] = useState<string | null>(null);
@@ -439,6 +518,7 @@ export default function EventDetailsPage() {
         setGuests([]);
         setInvites([]);
         setAllRsvps([]);
+setPollResponses([]);
         setPendingApprovals([]);
         setProfileNamesByEmail({});
         setProfileAvatarsByEmail({});
@@ -462,6 +542,7 @@ export default function EventDetailsPage() {
         setGuests([]);
         setInvites([]);
         setAllRsvps([]);
+setPollResponses([]);
         setPendingApprovals([]);
         setProfileNamesByEmail({});
         setProfileAvatarsByEmail({});
@@ -499,40 +580,47 @@ export default function EventDetailsPage() {
       const invitesPromise = canSeeInviteList
         ? supabase
             .from('event_invites')
-            .select('id, invitee_name, invitee_email_lc, invitee_phone_e164, created_at')
-            .eq('event_id', eventData.id)
-            .order('created_at', { ascending: false })
+            .select('id, invitee_name, invitee_email_lc, invitee_phone_e164, created_at, status, revoked_at')
+.eq('event_id', eventData.id)
+.is('revoked_at', null)
+.order('created_at', { ascending: false })
         : Promise.resolve({ data: [], error: null });
 
-      const [seriesRes, rsvpRes, guestListRes, pendingRes, invitesRes] = await Promise.all([
-        seriesPromise,
-        supabase.from('rsvps').select('*').eq('event_id', eventData.id),
-        supabase.rpc('get_guest_list', {
-          p_slug: slug,
-          p_viewer_email: viewerEmail || null,
-        }),
-        isHostViewer
-          ? supabase
-              .from('rsvp_join_requests')
-              .select('*')
-              .eq('event_id', eventData.id)
-              .eq('status', 'pending')
-              .order('created_at', { ascending: false })
-          : Promise.resolve({ data: [], error: null }),
-        invitesPromise,
-      ]);
-
-      if (seriesRes.error) throw seriesRes.error;
-      if (invitesRes.error) throw invitesRes.error;
+      const [seriesRes, rsvpRes, pollResponsesRes, guestListRes, pendingRes, invitesRes] =
+  await Promise.all([
+    seriesPromise,
+    supabase.from('rsvps').select('*').eq('event_id', eventData.id),
+    supabase
+      .from('vibe_responses')
+      .select('id, event_id, guest_name, user_email, selected_dates, note, created_at')
+      .eq('event_id', eventData.id),
+    supabase.rpc('get_guest_list', {
+      p_slug: slug,
+      p_viewer_email: viewerEmail || null,
+    }),
+    isHostViewer
+      ? supabase
+          .from('rsvp_join_requests')
+          .select('*')
+          .eq('event_id', eventData.id)
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
+    invitesPromise,
+  ]);
+    if (seriesRes.error) throw seriesRes.error;
+if (pollResponsesRes.error) throw pollResponsesRes.error;
+if (invitesRes.error) throw invitesRes.error;
 
       setSeriesEvents(seriesRes.data || []);
 
       const rsvps = rsvpRes.data || [];
       const guestList = decision.can_see_guest_list === true ? guestListRes.data || [] : [];
 
-      setAllRsvps(rsvps);
-      setGuests(guestList);
-      setInvites(invitesRes.data || []);
+    setAllRsvps(rsvps);
+setPollResponses(pollResponsesRes.data || []);
+setGuests(guestList);
+setInvites(invitesRes.data || []);
       setPendingApprovals(pendingRes.data || []);
 
       const emailSet = new Set<string>();
@@ -695,8 +783,18 @@ export default function EventDetailsPage() {
             thread_id: String(data),
           },
         } as any);
-      } catch (err) {
-        console.error(err);
+      } catch (err: any) {
+        const message = String(err?.message || '');
+
+        if (message.includes('blocked_user_interaction')) {
+          Alert.alert(
+            'Messaging unavailable',
+            'You can no longer message this user.'
+          );
+          return;
+        }
+
+        console.log('Unable to open message', err);
         Alert.alert('Unable to open message');
       } finally {
         setOpeningDmForEmail(null);
@@ -747,13 +845,17 @@ export default function EventDetailsPage() {
   }
 
   const isFixedDate = event.event_type === 'fixed_date' || event.event_type === 'formal';
-  const isPoll = event.event_type === 'poll';
+  const isPoll =
+  event.event_type === 'poll' ||
+  event.event_type === 'vibe';
   const isReachOut = event.event_type === 'reach_out';
   const isHost = viewerEmail !== '' && normalizeEmail(event.host_email) === viewerEmail;
   const myStatus = normalizeStatus(myRsvp?.status);
   const myStatusLabel = getRsvpLabel(myStatus);
   const isSeries = !!event?.series_id;
   const visibleSeriesEvents = seriesEvents.filter((item) => item?.id !== event?.id);
+  const seriesIndex = getSeriesIndex(seriesEvents, event.id);
+const seriesTotal = seriesEvents.length;
   const hostEmailLc = normalizeEmail(event.host_email);
   const hostNameFirst = getFirstName(event.host_name);
   const eventDateText = formatEventDate(event.starts_at);
@@ -770,7 +872,11 @@ export default function EventDetailsPage() {
     );
 
   const canOpenChat = isHost || hasRsvpAccess;
-  const canShowRsvpCta = accessDecision?.can_rsvp === true || isHost || !!myRsvp;
+  const canShowRsvpCta =
+  isReachOut ||
+  accessDecision?.can_rsvp === true ||
+  isHost ||
+  !!myRsvp;
   const canOpenHostDm = !!hostEmailLc && canDmTarget(hostEmailLc);
 
   const hasLocationInDesc = event.description?.includes('Location: ');
@@ -790,25 +896,32 @@ export default function EventDetailsPage() {
       };
     }
 
-    if (isHost) {
-      return {
-        label: 'Manage Event',
-        onPress: () => {
-          if (event.manage_handle) {
-            router.push(`/m/${event.manage_handle}` as any);
-            return;
-          }
-          router.push('/(tabs)' as any);
-        },
-      };
-    }
+   if (isHost && isReachOut) {
+  return {
+    label: 'Manage reach-out',
+    onPress: () => router.push(`/event/${slug}/reach-out` as any),
+  };
+}
+
+if (isHost) {
+  return {
+    label: 'Manage Event',
+    onPress: () => {
+      if (event.manage_handle) {
+        router.push(`/m/${event.manage_handle}` as any);
+        return;
+      }
+      router.push('/(tabs)' as any);
+    },
+  };
+}
 
     if (isReachOut) {
-      return {
-        label: `Message ${getFirstName(event.host_name)}`,
-        onPress: () => handleOpenOrCreateDm(hostEmailLc),
-      };
-    }
+  return {
+    label: 'Help make a plan',
+    onPress: () => router.push(`/event/${slug}/reach-out` as any),
+  };
+}
 
     if (isPoll) {
       return {
@@ -863,8 +976,10 @@ export default function EventDetailsPage() {
         ) : null}
 
         <View style={styles.content}>
-          <Text style={[styles.title, { color: theme.text }]}>{event.title}</Text>
-
+          <Text style={[styles.title, { color: theme.text }]}>
+  {event.title}
+  {seriesIndex ? ` (Part ${seriesIndex} of ${seriesTotal})` : ''}
+</Text>
           <HostHeaderSection
             theme={theme}
             hostAvatarUrl={hostAvatarUrl}
@@ -912,9 +1027,33 @@ export default function EventDetailsPage() {
               <Text style={[styles.descriptionText, { color: theme.text }]}>{description}</Text>
             </View>
           ) : null}
-
+{event.event_url ? (
+  <TouchableOpacity
+    style={[
+      styles.eventLinkCard,
+      {
+        backgroundColor: theme.isDark ? 'rgba(255,255,255,0.08)' : SYSTEM.surface,
+        borderColor: theme.isDark ? 'rgba(255,255,255,0.10)' : SYSTEM.borderSoft,
+      },
+    ]}
+    onPress={() => Linking.openURL(event.event_url)}
+  >
+    <MaterialCommunityIcons name="link-variant" size={22} color={theme.accent} />
+    <View style={styles.eventLinkTextWrap}>
+      <Text style={[styles.eventLinkTitle, { color: theme.text }]}>Open link</Text>
+      <Text style={[styles.eventLinkUrl, { color: theme.accent }]} numberOfLines={1}>
+        {event.event_url}
+      </Text>
+    </View>
+    <Ionicons name="open-outline" size={18} color={theme.accent} />
+  </TouchableOpacity>
+) : null}
           {isPoll ? (
-            <PollDatesSection theme={theme} proposedDates={event.proposed_dates || []} />
+            <PollDatesSection
+  theme={theme}
+  proposedDates={event.proposed_dates || []}
+  pollResponses={pollResponses}
+/>
           ) : null}
 
           {isSeries ? (
@@ -988,20 +1127,20 @@ export default function EventDetailsPage() {
             </>
           ) : null}
 
-          {accessDecision?.can_see_guest_list === true ? (
-            <DetailsGuestsSection
-              theme={theme}
-              guests={guests}
-              allRsvps={allRsvps}
-              invites={invites}
-              isHost={isHost}
-              canDmTarget={canDmTarget}
-              handleOpenOrCreateDm={handleOpenOrCreateDm}
-              openingDmForEmail={openingDmForEmail}
-              profileNamesByEmail={profileNamesByEmail}
-              profileAvatarsByEmail={profileAvatarsByEmail}
-            />
-          ) : null}
+          {accessDecision?.can_see_guest_list === true && !isPoll ? (
+  <DetailsGuestsSection
+    theme={theme}
+    guests={guests}
+    allRsvps={allRsvps}
+    invites={invites}
+    isHost={isHost}
+    canDmTarget={canDmTarget}
+    handleOpenOrCreateDm={handleOpenOrCreateDm}
+    openingDmForEmail={openingDmForEmail}
+    profileNamesByEmail={profileNamesByEmail}
+    profileAvatarsByEmail={profileAvatarsByEmail}
+  />
+) : null}
         </View>
 
         <View style={{ height: 60 }} />
@@ -1371,4 +1510,96 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     opacity: 0.9,
   },
+  pollResultsList: {
+  gap: 10,
+},
+
+pollResultCard: {
+  borderWidth: 1.5,
+  borderRadius: 16,
+  padding: 14,
+},
+
+pollResultHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 12,
+},
+
+pollResultDate: {
+  fontSize: 16,
+  fontWeight: '900',
+},
+
+pollResultTime: {
+  fontSize: 14,
+  fontWeight: '600',
+  opacity: 0.75,
+  marginTop: 2,
+},
+
+pollVoteBadge: {
+  minWidth: 34,
+  height: 34,
+  borderRadius: 17,
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingHorizontal: 8,
+},
+
+pollVoteBadgeText: {
+  fontSize: 15,
+  fontWeight: '900',
+},
+
+pollPopularLabel: {
+  fontSize: 13,
+  fontWeight: '900',
+  marginTop: 8,
+},
+
+pollVoterList: {
+  marginTop: 10,
+  gap: 4,
+},
+
+pollVoterName: {
+  fontSize: 14,
+  fontWeight: '700',
+  opacity: 0.9,
+},
+
+pollNoVotes: {
+  fontSize: 14,
+  fontWeight: '600',
+  opacity: 0.55,
+},
+eventLinkCard: {
+  minHeight: 58,
+  borderRadius: 16,
+  borderWidth: 1,
+  paddingHorizontal: 14,
+  paddingVertical: 12,
+  marginBottom: 18,
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 10,
+},
+
+eventLinkTextWrap: {
+  flex: 1,
+  minWidth: 0,
+},
+
+eventLinkTitle: {
+  fontSize: 15,
+  fontWeight: '900',
+},
+
+eventLinkUrl: {
+  marginTop: 2,
+  fontSize: 13,
+  fontWeight: '700',
+},
 });

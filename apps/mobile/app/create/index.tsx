@@ -75,13 +75,13 @@ const AMBIENT_LINES = [
 ];
 
 const QUICK_STARTS: QuickStart[] = [
+    { label: 'Start something', icon: 'add-outline', route: '/create/vibe', params: { prefill_title: 'Your event', prefill_desc: 'Add details here' } },
   { label: 'Quick Coffee', icon: 'cafe-outline', route: '/create/vibe', params: { prefill_title: 'A coffee date', prefill_desc: 'Coffee is better with you!' } },
   { label: 'Trendy Dinner', icon: 'restaurant-outline', route: '/create/formal', params: { prefill_title: 'A trendy dinner date', prefill_desc: 'Eating dinner is better with you!' } },
   { label: 'Casual Drinks', icon: 'wine-outline', route: '/create/vibe', params: { prefill_title: 'A night of cocktails', prefill_desc: 'Drinking is better with you!' } },
   { label: 'Take a Walk', icon: 'walk-outline', route: '/create/vibe', params: { prefill_title: 'A stroll in the park', prefill_desc: 'Walking is better with you!' } },
   { label: 'Visit a Museum', icon: 'business-outline', route: '/create/vibe', params: { prefill_title: 'A cultural visit to a museum', prefill_desc: 'Museums are better with you!' } },
-  { label: 'Something else (Karaoke!)', icon: 'add-circle-outline', route: '/create/vibe', featured: true },
-  { label: 'Ask to hang out', icon: 'help-circle-outline', route: '/create/vibe', featured: true },
+  
 ];
 
 export default function CreateLaunchpad() {
@@ -171,7 +171,7 @@ const handleClose = () => {
   ) : <View />}
 </View>
 
-        <StyledText style={styles.title}>Good times, made easy</StyledText>
+        <StyledText style={styles.title}>Good Times, Easy Plans</StyledText>
         <StyledText style={styles.ambientLine}>{ambientLine}</StyledText>
 
         <View style={styles.grid}>
@@ -201,16 +201,7 @@ const handleClose = () => {
     </TouchableOpacity>
   ))}
 
-  {customCards.length < MAX_CUSTOM_CARDS && (
-    <TouchableOpacity style={[styles.gridCard, styles.addOwnCard]} onPress={() => setShowAddModal(true)}>
-      <View style={styles.gridIconCircle}>
-        <Ionicons name="add-outline" size={24} color={COLORS.primary} />
-      </View>
-      <StyledText style={styles.gridLabel} numberOfLines={2}>
-        Add card
-      </StyledText>
-    </TouchableOpacity>
-  )}
+
 </View>
         <View style={styles.featuredWrap}>
           {featuredCards.map((item) => (

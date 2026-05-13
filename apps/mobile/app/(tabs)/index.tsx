@@ -4,12 +4,9 @@
  * - What is Happening
  * - Reconnect
  * - Start Something
- *
- * This version keeps the existing dashboard components,
- * but moves feed-state and feed-signal derivation into a central truth layer.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   ScrollView,
   View,
@@ -27,6 +24,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { supabase, useSession } from '@pallinky/core';
 import { StyledText, DASHBOARD_THEMES } from '@pallinky/ui';
+import { t } from '@pallinky/i18n';
+import type { AppLanguage, TranslationKey } from '@pallinky/i18n/types';
 
 import MyPlansList from '../../components/dashboard/MyPlansList';
 import FriendsActivities from '../../components/dashboard/FriendsActivities';
@@ -40,18 +39,25 @@ import {
 type IdeaPrompt = {
   key: string;
   emoji: string;
-  title: string;
-  subtitle: string;
+  titleKey: TranslationKey;
+  subtitleKey: TranslationKey;
   route: string;
   params?: Record<string, string>;
 };
 
 const IDEA_PROMPTS: IdeaPrompt[] = [
   {
+    key: 'start',
+    emoji: '📅',
+    titleKey: 'home_idea_make_plan_title',
+    subtitleKey: 'home_idea_make_plan_subtitle',
+    route: '/create',
+  },
+  {
     key: 'coffee',
     emoji: '☕',
-    title: 'Coffee this week',
-    subtitle: 'Low-friction catch-up',
+    titleKey: 'home_idea_coffee_title',
+    subtitleKey: 'home_idea_coffee_subtitle',
     route: '/create/vibe',
     params: {
       prefill_title: 'Coffee?',
@@ -61,8 +67,8 @@ const IDEA_PROMPTS: IdeaPrompt[] = [
   {
     key: 'drinks',
     emoji: '🍸',
-    title: 'Drinks tonight',
-    subtitle: 'See who is around',
+    titleKey: 'home_idea_drinks_title',
+    subtitleKey: 'home_idea_drinks_subtitle',
     route: '/create/vibe',
     params: {
       prefill_title: 'Drinks?',
@@ -72,8 +78,8 @@ const IDEA_PROMPTS: IdeaPrompt[] = [
   {
     key: 'dinner',
     emoji: '🍽️',
-    title: 'Dinner this weekend',
-    subtitle: 'Start a real plan',
+    titleKey: 'home_idea_dinner_title',
+    subtitleKey: 'home_idea_dinner_subtitle',
     route: '/create/formal',
     params: {
       prefill_title: 'Dinner',
@@ -83,8 +89,8 @@ const IDEA_PROMPTS: IdeaPrompt[] = [
   {
     key: 'walk',
     emoji: '🚶',
-    title: 'Walk in the park',
-    subtitle: 'Easy outdoor plan',
+    titleKey: 'home_idea_walk_title',
+    subtitleKey: 'home_idea_walk_subtitle',
     route: '/create/vibe',
     params: {
       prefill_title: 'Walk?',
@@ -94,8 +100,8 @@ const IDEA_PROMPTS: IdeaPrompt[] = [
   {
     key: 'movie',
     emoji: '🎬',
-    title: 'Movie night',
-    subtitle: 'Quick group invite',
+    titleKey: 'home_idea_movie_title',
+    subtitleKey: 'home_idea_movie_subtitle',
     route: '/create/vibe',
     params: {
       prefill_title: 'Movie?',
@@ -115,7 +121,12 @@ function normalizeId(value: unknown) {
 export default function HomeScreen() {
   const router = useRouter();
   const { session } = useSession();
-
+  const lang: AppLanguage = 'en';
+useEffect(() => {
+  if (!session?.user?.email) {
+    router.replace('/welcome');
+  }
+}, [session?.user?.email, router]);
   const [loading, setLoading] = useState(true);
   const [themeKey, setThemeKey] = useState('classic');
   const [deviceContactCount, setDeviceContactCount] = useState(0);
@@ -168,8 +179,8 @@ export default function HomeScreen() {
           .maybeSingle(),
         supabase
           .from('people')
-          .select('id, primary_email_lc, matched_user_id')
-          .or(`matched_user_id.eq.${session.user.id},primary_email_lc.eq.${emailLower}`)
+          .select('id, email_lc, matched_user_id')
+          .or(`matched_user_id.eq.${session.user.id},email_lc.eq.${emailLower}`)
           .limit(1)
           .maybeSingle(),
       ]);
@@ -201,7 +212,7 @@ export default function HomeScreen() {
         supabase
           .from('vibe_responses')
           .select('*')
-          .eq('email_lc', emailLower),
+          .eq('user_email', emailLower),
 
         profile?.id
           ? supabase
@@ -469,13 +480,15 @@ export default function HomeScreen() {
     }, [session])
   );
 
-  const theme = DASHBOARD_THEMES[themeKey] || DASHBOARD_THEMES.classic;
+ const theme = DASHBOARD_THEMES[themeKey] || DASHBOARD_THEMES.classic;
 
   const feed = useMemo(() => {
-    return deriveFeedSignals({
+    const result = deriveFeedSignals({
       data,
       deviceContactCount,
     });
+
+    return result;
   }, [data, deviceContactCount]);
 
   const feedState: FeedState = feed.feedState;
@@ -489,12 +502,7 @@ export default function HomeScreen() {
 
       if (accessByEventId[evId]?.can_see !== true) return false;
 
-      return (
-        s.type === 'upcoming_plan' ||
-        s.type === 'event_starting_soon' ||
-        s.type === 'friend_created_event' ||
-        s.type === 'friend_attending_event'
-      );
+      return s.type === 'upcoming_plan' || s.type === 'event_starting_soon';
     });
 
     const hostedEvents = data.events
@@ -520,35 +528,38 @@ export default function HomeScreen() {
       ? IDEA_PROMPTS.slice(0, 3)
       : IDEA_PROMPTS.slice(0, 4);
 
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator color="#0077b6" size="large" />
-      </View>
-    );
-  }
-
+  if (loading || !session?.user?.email) {
+  return (
+    <View style={styles.centered}>
+      <ActivityIndicator color="#0077b6" size="large" />
+    </View>
+  );
+}
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.bg }}>
       <View style={styles.header}>
         <View style={{ flex: 1, paddingRight: 12 }}>
-          <StyledText style={[styles.mainTitle, { color: theme.text }]}>Social Feed</StyledText>
+          <StyledText style={[styles.mainTitle, { color: theme.text }]}>
+            {t(lang, 'home_title')}
+          </StyledText>
           <StyledText style={[styles.mainSubtitle, { color: '#66715f' }]}>
-            Plans and people moving around you.
+            {t(lang, 'home_subtitle')}
           </StyledText>
         </View>
 
         <TouchableOpacity onPress={() => router.push('/profile')}>
-          <Image
-            source={{
-              uri:
-                avatarUrl ||
-                `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                  session?.user?.email || 'U'
-                )}&background=43691b&color=fff`,
-            }}
-            style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: '#eee' }}
-          />
+          {session?.user?.email ? (
+  <Image
+    source={{
+      uri:
+        avatarUrl ||
+        `https://ui-avatars.com/api/?name=${encodeURIComponent(
+          session.user.email
+        )}&background=43691b&color=fff`,
+    }}
+    style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: '#eee' }}
+  />
+) : null}
         </TouchableOpacity>
       </View>
 
@@ -559,12 +570,13 @@ export default function HomeScreen() {
         {feedState === 'cold_start' ? (
           <>
             <FeedSectionHeader
-              title="Start Something"
-              subtitle="The fastest way to get motion into your feed."
+              title={t(lang, 'home_start_something_title')}
+              subtitle={t(lang, 'home_start_something_cold_subtitle')}
               theme={theme}
             />
             <StartSomethingSection
               prompts={visibleIdeaPrompts}
+              lang={lang}
               onPressPrompt={(prompt) =>
                 router.push({
                   pathname: prompt.route as any,
@@ -574,17 +586,17 @@ export default function HomeScreen() {
             />
 
             <FeedSectionHeader
-              title="What is Happening?"
-              subtitle="Once plans and people start showing up, they will appear here."
+              title={t(lang, 'home_happening_title')}
+              subtitle={t(lang, 'home_happening_cold_subtitle')}
               theme={theme}
             />
-            <EmptyBrewingCard theme={theme} />
+            <EmptyBrewingCard theme={theme} lang={lang} />
           </>
         ) : (
           <>
             <FeedSectionHeader
-              title="What is Happening?"
-              subtitle="Your active plans"
+              title={t(lang, 'home_happening_title')}
+              subtitle={t(lang, 'home_happening_active_subtitle')}
               theme={theme}
             />
             <WhatIsBrewingSection
@@ -594,21 +606,23 @@ export default function HomeScreen() {
               onRefresh={loadData}
             />
 
-            {brewingSignals.some(
-              (s) => s.type === 'friend_created_event' || s.type === 'friend_attending_event'
-            ) && (
+            {feed.items.some(
+  (s) => s.type === 'friend_created_event' || s.type === 'friend_attending_event'
+) && (
               <>
                 <FeedSectionHeader
-                  title="Your friends active plans"
-                  subtitle="Don't worry, they said you could peek, and we won't show them that you did"
+                  title={t(lang, 'home_friends_active_title')}
+                  subtitle={t(lang, 'home_friends_active_subtitle')}
                   theme={theme}
                 />
                 <FriendsActivities
-                  data={data}
-                  theme={theme}
-                  signals={brewingSignals}
-                  onRefresh={loadData}
-                />
+  data={data}
+  theme={theme}
+  signals={feed.items.filter(
+    (s) => s.type === 'friend_created_event' || s.type === 'friend_attending_event'
+  )}
+  onRefresh={loadData}
+/>
               </>
             )}
 
@@ -617,16 +631,18 @@ export default function HomeScreen() {
               theme={theme}
               signals={feed.items}
               onRefresh={loadData}
+              lang={lang}
             />
 
             <FeedSectionHeader
-              title="Start Something"
-              subtitle="Fast prompts to open the create flow."
+              title={t(lang, 'home_start_something_title')}
+              subtitle={t(lang, 'home_start_something_warm_subtitle')}
               theme={theme}
               compact={compactStartSomething}
             />
             <StartSomethingSection
               prompts={visibleIdeaPrompts}
+              lang={lang}
               compact={compactStartSomething}
               onPressPrompt={(prompt) =>
                 router.push({
@@ -695,11 +711,13 @@ function ReconnectSection({
   theme,
   signals,
   onRefresh,
+  lang,
 }: {
   data: any;
   theme: any;
   signals: any[];
   onRefresh?: () => void;
+  lang: AppLanguage;
 }) {
   const suggestionSignals = signals.filter((s) => s.type === 'suggested_connection');
 
@@ -708,8 +726,8 @@ function ReconnectSection({
   return (
     <>
       <FeedSectionHeader
-        title="Connect"
-        subtitle="People you may want to pull into orbit."
+        title={t(lang, 'home_connect_title')}
+        subtitle={t(lang, 'home_connect_subtitle')}
         theme={theme}
       />
 
@@ -726,10 +744,12 @@ function ReconnectSection({
 function StartSomethingSection({
   prompts,
   onPressPrompt,
+  lang,
   compact = false,
 }: {
   prompts: IdeaPrompt[];
   onPressPrompt: (prompt: IdeaPrompt) => void;
+  lang: AppLanguage;
   compact?: boolean;
 }) {
   return (
@@ -749,11 +769,11 @@ function StartSomethingSection({
           ]}
         >
           <StyledText style={styles.ideaEmoji}>{prompt.emoji}</StyledText>
-          <StyledText style={styles.ideaTitle}>{prompt.title}</StyledText>
-          <StyledText style={styles.ideaSubtitle}>{prompt.subtitle}</StyledText>
+          <StyledText style={styles.ideaTitle}>{t(lang, prompt.titleKey)}</StyledText>
+          <StyledText style={styles.ideaSubtitle}>{t(lang, prompt.subtitleKey)}</StyledText>
 
           <View style={styles.ideaFooter}>
-            <StyledText style={styles.ideaAction}>Start</StyledText>
+            <StyledText style={styles.ideaAction}>{t(lang, 'common_start')}</StyledText>
             <Ionicons name="arrow-forward" size={14} color="#1f2a1b" />
           </View>
         </Pressable>
@@ -765,9 +785,11 @@ function StartSomethingSection({
 function ImportCoffeeCard({
   theme,
   onPress,
+  lang,
 }: {
   theme: any;
   onPress: () => void;
+  lang: AppLanguage;
 }) {
   return (
     <Pressable
@@ -782,9 +804,9 @@ function ImportCoffeeCard({
         <Ionicons name="cafe-outline" size={20} color="#1f2a1b" />
       </View>
       <View style={{ flex: 1 }}>
-        <StyledText style={styles.utilityTitle}>Invite someone for coffee</StyledText>
+        <StyledText style={styles.utilityTitle}>{t(lang, 'home_import_coffee_title')}</StyledText>
         <StyledText style={styles.utilitySubtitle}>
-          One easy plan is enough to get things moving.
+          {t(lang, 'home_import_coffee_subtitle')}
         </StyledText>
       </View>
       <Ionicons name="chevron-forward" size={18} color="#64748b" />
@@ -792,7 +814,7 @@ function ImportCoffeeCard({
   );
 }
 
-function EmptyBrewingCard({ theme }: { theme: any }) {
+function EmptyBrewingCard({ theme, lang }: { theme: any; lang: AppLanguage }) {
   return (
     <View
       style={[
@@ -804,9 +826,9 @@ function EmptyBrewingCard({ theme }: { theme: any }) {
         <Ionicons name="sparkles-outline" size={20} color="#1f2a1b" />
       </View>
       <View style={{ flex: 1 }}>
-        <StyledText style={styles.utilityTitle}>No live activity yet</StyledText>
+        <StyledText style={styles.utilityTitle}>{t(lang, 'home_empty_activity_title')}</StyledText>
         <StyledText style={styles.utilitySubtitle}>
-          As soon as plans, invites, or network activity appear, this section will populate.
+          {t(lang, 'home_empty_activity_subtitle')}
         </StyledText>
       </View>
     </View>
@@ -820,7 +842,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#F6F7F9',
   },
-
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -828,48 +849,40 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
   },
-
   mainTitle: {
     fontSize: 28,
     fontWeight: '900',
     letterSpacing: -0.5,
     color: '#1f2a1b',
   },
-
   scrollContent: {
     paddingBottom: 20,
     backgroundColor: '#F6F7F9',
   },
-
   sectionHeader: {
     paddingHorizontal: 16,
     marginTop: 18,
     marginBottom: 6,
   },
-
   sectionHeaderCompact: {
     marginTop: 14,
   },
-
   sectionTitle: {
     fontSize: 18,
     fontWeight: '900',
     letterSpacing: -0.3,
     color: '#1f2a1b',
   },
-
   sectionSubtitle: {
     fontSize: 13,
     marginTop: 4,
     color: '#66715f',
   },
-
   ideaScrollContent: {
     paddingHorizontal: 16,
     paddingTop: 4,
     paddingBottom: 4,
   },
-
   ideaCard: {
     width: 170,
     minHeight: 150,
@@ -881,43 +894,36 @@ const styles = StyleSheet.create({
     borderColor: '#bac9ad',
     justifyContent: 'space-between',
   },
-
   ideaCardCompact: {
     width: 155,
     minHeight: 136,
   },
-
   ideaEmoji: {
     fontSize: 24,
   },
-
   ideaTitle: {
     fontSize: 16,
     fontWeight: '800',
     color: '#1f2a1b',
     marginTop: 10,
   },
-
   ideaSubtitle: {
     fontSize: 12,
     color: '#66715f',
     marginTop: 6,
     lineHeight: 17,
   },
-
   ideaFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     marginTop: 14,
   },
-
   ideaAction: {
     fontSize: 12,
     fontWeight: '800',
     color: '#43691b',
   },
-
   utilityCard: {
     marginHorizontal: 16,
     marginTop: 6,
@@ -930,7 +936,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-
   utilityIconWrap: {
     width: 36,
     height: 36,
@@ -941,7 +946,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-
   utilityTitle: {
     fontSize: 15,
     fontWeight: '800',

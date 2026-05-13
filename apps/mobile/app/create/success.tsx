@@ -243,7 +243,7 @@ await Share.share({ message });
                 </View>
               </TouchableOpacity>
             </View>
-
+{/*
             <TouchableOpacity style={styles.circlesCard} onPress={() => requireHost('circles')}>
               <View style={styles.circlesIcon}>
                 <Ionicons name="people" size={24} color="#fff" />
@@ -262,8 +262,8 @@ await Share.share({ message });
                 color={COLORS.primary}
               />
             </TouchableOpacity>
-
-            {isPublicEvent ? (
+*/}
+            
               <View style={styles.card}>
                 <StyledText style={styles.label}>Your Invite Link</StyledText>
 
@@ -302,7 +302,7 @@ await Share.share({ message });
                   </StyledText>
                 </View>
               </View>
-            ) : null}
+           
 
             <TouchableOpacity
               style={styles.circlesCard}

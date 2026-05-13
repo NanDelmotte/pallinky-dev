@@ -1,7 +1,7 @@
 /**
  * Path: apps/mobile/components/dashboard/PeopleYouMayKnow.tsx
- * Description: Reconnect suggestions driven by feed signals when available.
- * Uses relational Social Circles membership via social_circle_members.
+  * Description: Second-degree connection suggestions driven by feed signals.
+ * Circles are used only for organizing added people.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -95,14 +95,11 @@ function buildReconnectSubtitle(
       return `You both know ${firstBridgeName}`;
     }
 
-    return 'Friend of a friend';
+    return 'Connected through your network';
   }
 
-  if (payload?.lastSeenEventTitle === 'in your contacts') {
-    return 'Already in your contacts';
-  }
 
-  return payload?.subtitle || payload?.signal_reason || "You haven’t seen each other in a while";
+  return payload?.subtitle || payload?.signal_reason || 'Connected through your network';
 }
 
 function buildReconnectPersonFromSignal(signal: any): SuggestionPerson {
@@ -147,7 +144,7 @@ export default function PeopleYouMayKnow({
   const [loading, setLoading] = useState(false);
   const [profileMap, setProfileMap] = useState<Map<string, ProfileRow>>(new Map());
 
-  const myCircleEmails = useMemo(() => {
+  const existingDirectEmails = useMemo(() => {
     const set = new Set<string>();
 
     for (const circle of socialCircles) {
@@ -174,7 +171,7 @@ export default function PeopleYouMayKnow({
               return (
                 !!personEmail &&
                 personEmail !== emailLower &&
-                !myCircleEmails.has(personEmail) &&
+                !existingDirectEmails.has(personEmail) &&
                 !removedEmails.includes(personEmail)
               );
             })
@@ -191,14 +188,14 @@ export default function PeopleYouMayKnow({
             return (
               !!rEmail &&
               rEmail !== emailLower &&
-              !myCircleEmails.has(rEmail) &&
+              !existingDirectEmails.has(rEmail) &&
               !removedEmails.includes(rEmail)
             );
           })
           .map((item) => [normalizeEmail(item.email_lc || item.email), item] as const)
       ).values()
     ) as SuggestionPerson[];
-  }, [signals, rsvps, emailLower, myCircleEmails, removedEmails]);
+  }, [signals, rsvps, emailLower, existingDirectEmails, removedEmails]);
 
   useEffect(() => {
     const emails = Array.from(
@@ -407,10 +404,10 @@ export default function PeopleYouMayKnow({
           </View>
 
           <View style={{ flex: 1 }}>
-            <StyledText style={styles.emptyTitle}>No connect signals yet</StyledText>
-            <StyledText style={styles.emptySubtitle}>
-              As you add people and build circles, connect suggestions will appear here.
-            </StyledText>
+            <StyledText style={styles.emptyTitle}>No second-degree suggestions yet</StyledText>
+<StyledText style={styles.emptySubtitle}>
+  When you attend events, your network grows, and people will appear here.
+</StyledText>
           </View>
 
           <Ionicons name="chevron-forward" size={18} color="#64748b" />
@@ -475,15 +472,14 @@ export default function PeopleYouMayKnow({
         >
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <StyledText style={styles.modalTitle}>Add to a Circle</StyledText>
+              <StyledText style={styles.modalTitle}>Add to Pallinky</StyledText>
               <TouchableOpacity onPress={closeModal}>
                 <Ionicons name="close" size={28} color="#1f2a1b" />
               </TouchableOpacity>
             </View>
 
             <StyledText style={styles.subTitle}>
-              Where does {selectedPerson?.name || selectedPerson?.full_name || 'this person'} fit
-              in?
+              Tag {selectedPerson?.name || selectedPerson?.full_name || 'this person'} to one of your circles.
             </StyledText>
 
             {socialCircles.length > 0 && (

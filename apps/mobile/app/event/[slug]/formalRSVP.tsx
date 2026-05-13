@@ -324,7 +324,7 @@ export default function FormalRSVP() {
         <View style={styles.content}>
           <Text style={[styles.title, { color: theme.text }, customFont]}>{event.title}</Text>
           <Text style={[styles.host, { color: theme.text, opacity: 0.7 }, customFont]}>
-            Hosted by {event.host_name}
+            Invited by {event.host_name}
           </Text>
 
           <View style={styles.infoBox}>
@@ -483,11 +483,10 @@ export default function FormalRSVP() {
         </View>
 
         <Modal visible={modalVisible} animationType="slide" transparent>
-          <KeyboardAvoidingView
-            style={styles.modalKeyboardWrap}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
-          >
+         <KeyboardAvoidingView
+  style={{ flex: 1 }}
+  behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+>
             <View style={styles.modalOverlay}>
               <View
                 style={[
@@ -499,10 +498,11 @@ export default function FormalRSVP() {
                 ]}
               >
                 <ScrollView
-                  showsVerticalScrollIndicator={false}
-                  keyboardShouldPersistTaps="handled"
-                  contentContainerStyle={styles.modalScrollContent}
-                >
+  showsVerticalScrollIndicator={false}
+  keyboardShouldPersistTaps="handled"
+  keyboardDismissMode="on-drag"
+  contentContainerStyle={{ paddingBottom: 120 }}
+>
                   <Text style={[styles.modalTitle, { color: theme.text }, customFont]}>
                     {requiresApproval ? 'Request to Join' : 'RSVP'}
                   </Text>

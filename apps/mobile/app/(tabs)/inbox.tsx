@@ -5,12 +5,11 @@
  * and swipe-left dismiss except for DM rows.
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -18,9 +17,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Swipeable } from 'react-native-gesture-handler';
+import { ScrollView, Swipeable } from 'react-native-gesture-handler';
 import { StyledText } from '@pallinky/ui';
-import { supabase } from '@pallinky/core';
+import { supabase, useSession } from '@pallinky/core';
 
 const COLORS = {
   background: '#F6F7F9',
@@ -100,9 +99,13 @@ function getRowTitle(row: InboxRow, eventTitle: string) {
     return getDmCounterpartName(row);
   }
 
+  const payload = row.latest_payload || {};
+
   switch (row.notification_type) {
     case 'invite_created':
-      return 'Invitation';
+      if (payload.event_type === 'reach_out') return 'Reaching Out';
+      return payload.is_series === true ? 'Series invitation' : 'Invitation';
+
     case 'chat_message_batch':
       return row.unread_count > 1 ? `${row.unread_count} new messages` : 'New message';
     case 'event_updated':
@@ -119,6 +122,8 @@ function getRowTitle(row: InboxRow, eventTitle: string) {
       return 'Event cancelled';
     case 'host_message':
       return 'Message from host';
+    case 'reach_out_suggestion':
+      return 'New plan suggestion';
     case 'rsvp_deadline_reminder':
       return 'RSVP reminder';
     case 'guest_rsvp_confirmation':
@@ -137,7 +142,9 @@ function getRowBody(row: InboxRow, eventTitle: string) {
 
   switch (row.notification_type) {
     case 'invite_created':
-      return `${payload.host_name || 'Someone'} invited you to ${eventTitle}`;
+  return payload.event_type === 'reach_out'
+    ? `${payload.host_name || 'Someone'} reached out for ${eventTitle}`
+    : `${payload.host_name || 'Someone'} invited you to ${eventTitle}`;
     case 'chat_message_batch':
       return `In ${eventTitle}`;
     case 'event_updated':
@@ -154,7 +161,8 @@ function getRowBody(row: InboxRow, eventTitle: string) {
       return `You're in for ${eventTitle}`;
     case 'join_request_denied':
       return `Your request for ${eventTitle} was declined`;
-    case 'event_cancelled':
+    case 'reach_out_suggestion':
+  return `${payload.guest_name || 'Someone'} suggested something for ${eventTitle}`;case 'event_cancelled':
       return payload.message
         ? `${eventTitle} — ${payload.message}`
         : `${eventTitle} was cancelled`;
@@ -204,19 +212,36 @@ function getRowIcon(row: InboxRow) {
 
 export default function InboxTabScreen() {
   const router = useRouter();
+  const { session } = useSession();
+
+  const userEmailLc = session?.user?.email?.toLowerCase().trim() || '';
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [rows, setRows] = useState<InboxRow[]>([]);
   const [eventsById, setEventsById] = useState<EventMap>({});
   const [dismissingId, setDismissingId] = useState<string | null>(null);
-
+useEffect(() => {
+  setRows([]);
+  setEventsById({});
+  setDismissingId(null);
+}, [userEmailLc]);
   const loadInbox = useCallback(async () => {
-    try {
+  if (!userEmailLc) {
+    setRows([]);
+    setEventsById({});
+    setLoading(false);
+    setRefreshing(false);
+    return;
+  }
+
+  try {
       const { data, error } = await supabase.rpc('get_my_notifications_inbox');
 
       if (error) throw error;
 
-      const inboxRows = (data || []) as InboxRow[];
+      const inboxRows = ((data || []) as InboxRow[]).filter(
+  (row) => row.user_email_lc === userEmailLc
+);
       setRows(inboxRows);
 
       const eventIds = Array.from(
@@ -250,7 +275,7 @@ export default function InboxTabScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [userEmailLc]);
 
   useFocusEffect(
     useCallback(() => {
@@ -343,14 +368,14 @@ export default function InboxTabScreen() {
     [eventsById, router]
   );
 
-  const renderRightActions = useCallback(() => {
-    return (
-      <View style={styles.dismissAction}>
-        <Ionicons name="trash-outline" size={20} color="#fff" />
-        <StyledText style={styles.dismissActionText}>Dismiss</StyledText>
-      </View>
-    );
-  }, []);
+  const renderDismissActions = useCallback(() => {
+  return (
+    <View style={styles.dismissAction}>
+      <Ionicons name="trash-outline" size={20} color="#fff" />
+      <StyledText style={styles.dismissActionText}>Dismiss</StyledText>
+    </View>
+  );
+}, []);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -433,20 +458,21 @@ export default function InboxTabScreen() {
               }
 
               return (
-                <Swipeable
-                  key={row.id}
-                  renderRightActions={renderRightActions}
-                  rightThreshold={40}
-                  overshootRight={false}
-                  enabled={dismissingId !== row.id}
-                  onSwipeableOpen={(direction) => {
-                    if (direction === 'right') {
-                      void handleDismissRow(row);
-                    }
-                  }}
-                >
-                  {rowContent}
-                </Swipeable>
+               <Swipeable
+  key={row.id}
+  renderLeftActions={renderDismissActions}
+  renderRightActions={renderDismissActions}
+  leftThreshold={30}
+  rightThreshold={30}
+  overshootLeft={false}
+  overshootRight={false}
+  enabled={dismissingId !== row.id}
+  onSwipeableOpen={() => {
+    void handleDismissRow(row);
+  }}
+>
+  {rowContent}
+</Swipeable>
               );
             })
           )}

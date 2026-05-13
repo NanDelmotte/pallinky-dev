@@ -15,13 +15,14 @@ import {
   Image,
   Alert,
   TextInput,
+  Modal,
 } from 'react-native';
 import { StyledText } from '@pallinky/ui';
 import { supabase, useSession } from '@pallinky/core';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-
+import QRCode from 'react-native-qrcode-svg';
 interface ProfileRow {
   id: string;
   email_lc: string | null;
@@ -101,7 +102,7 @@ export default function ProfileScreen() {
 
   const [editingName, setEditingName] = useState(false);
   const [draftName, setDraftName] = useState('');
-
+const [qrVisible, setQrVisible] = useState(false);
   const emailLower = normalizeEmail(session?.user?.email);
 
   const displayName = useMemo(() => {
@@ -112,7 +113,9 @@ export default function ProfileScreen() {
   }, [profile?.full_name, emailLower]);
 
   const avatarUrl = profile?.avatar_url || avatarFallback(displayName);
-
+const qrValue = profile?.id
+  ? `https://pallinky.com/add?profileId=${profile.id}`
+  : '';
   const joinedDate = useMemo(() => {
     const fromProfile = profile?.created_at || null;
     const fromAuth = (session?.user as any)?.created_at || null;
@@ -347,12 +350,37 @@ export default function ProfileScreen() {
   }
 
   if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator color="#43691b" size="large" />
-      </View>
-    );
-  }
+  return (
+    <View style={styles.centered}>
+      <ActivityIndicator color="#43691b" size="large" />
+    </View>
+  );
+}
+
+if (!session?.user?.id) {
+  return (
+    <View style={styles.centered}>
+      <StyledText style={{ color: '#1f2a1b', fontSize: 16, fontWeight: '700' }}>
+        Please log in to view your profile.
+      </StyledText>
+
+      <TouchableOpacity
+        onPress={() => router.replace('/welcome')}
+        style={{
+          marginTop: 16,
+          backgroundColor: '#43691b',
+          paddingHorizontal: 18,
+          paddingVertical: 12,
+          borderRadius: 999,
+        }}
+      >
+        <StyledText style={{ color: '#fff', fontWeight: '800' }}>
+          Go to welcome
+        </StyledText>
+      </TouchableOpacity>
+    </View>
+  );
+}
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -417,6 +445,12 @@ export default function ProfileScreen() {
         )}
 
         {joinedDate ? <StyledText style={styles.joined}>Joined {joinedDate}</StyledText> : null}
+        {qrValue ? (
+  <TouchableOpacity style={styles.qrButton} onPress={() => setQrVisible(true)}>
+    <Ionicons name="qr-code-outline" size={18} color="#43691b" />
+    <StyledText style={styles.qrButtonText}>Show my Pallinky QR</StyledText>
+  </TouchableOpacity>
+) : null}
       </View>
 
       <View style={styles.statsRow}>
@@ -469,6 +503,26 @@ export default function ProfileScreen() {
           ))
         )}
       </View>
+      <Modal visible={qrVisible} transparent animationType="fade">
+        <View style={styles.qrOverlay}>
+          <View style={styles.qrCard}>
+            <TouchableOpacity style={styles.qrClose} onPress={() => setQrVisible(false)}>
+              <Ionicons name="close" size={26} color="#1f2a1b" />
+            </TouchableOpacity>
+
+            <Image source={{ uri: avatarUrl }} style={styles.qrAvatar} />
+
+            <StyledText style={styles.qrTitle}>Add {displayName}</StyledText>
+            <StyledText style={styles.qrSubtitle}>
+              Scan this QR code to add me to Pallinky contacts.
+            </StyledText>
+
+            <View style={styles.qrBox}>
+              <QRCode value={qrValue} size={220} />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -691,5 +745,69 @@ const styles = StyleSheet.create({
   },
   rsvpedBadgeText: {
     color: '#6A4C93',
+  },
+    qrButton: {
+    marginTop: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#f3f8ed',
+    borderWidth: 1,
+    borderColor: '#bac9ad',
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  qrButtonText: {
+    color: '#43691b',
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  qrOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  qrCard: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#fff',
+    borderRadius: 28,
+    padding: 24,
+    alignItems: 'center',
+  },
+  qrClose: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    zIndex: 2,
+  },
+  qrAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#eee',
+    marginBottom: 12,
+  },
+  qrTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#1f2a1b',
+    textAlign: 'center',
+  },
+  qrSubtitle: {
+    marginTop: 6,
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  qrBox: {
+    marginTop: 20,
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 18,
   },
 });

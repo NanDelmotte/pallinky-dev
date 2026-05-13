@@ -478,9 +478,11 @@ const initialEndsAt = endsAtParam ? new Date(endsAtParam) : null;
         location,
         hostName: effectiveHostName,
         hostEmail: effectiveEmail,
-        keyword: `vibe-${Math.random().toString(36).substring(2, 7)}`,
+        keyword: `${form.whenMode === 'unsure' ? 'reach-out' : 'poll'}-${Math.random()
+  .toString(36)
+  .substring(2, 7)}`,
         gifKey: 'waves',
-        eventType: 'vibe',
+        eventType: form.whenMode === 'unsure' ? 'reach_out' : 'poll',
         proposedDates:
           form.whenMode === 'options'
             ? form.pollOptions.map((d) => d.toISOString())
