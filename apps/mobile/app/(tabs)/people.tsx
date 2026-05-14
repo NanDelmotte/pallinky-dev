@@ -1,10 +1,5 @@
-/**
- * Path: apps/mobile/app/(tabs)/people.tsx
- * Description:
- * Direct relationships are driven by derived relationship signals.
- * Circles are organization labels for direct relationships.
- * Circles are rendered as a first-class section and managed via CircleManagerSheet.
- */
+// apps/mobile/app/(tabs)/people.tsx
+// People page with Connections + Circles tabs.
 
 import React, { useCallback, useMemo, useState } from 'react';
 import {
@@ -14,7 +9,6 @@ import {
   ActivityIndicator,
   Image,
   Pressable,
-  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -24,7 +18,7 @@ import { StyledText } from '@pallinky/ui';
 import { supabase, useSession } from '@pallinky/core';
 import { t } from '@pallinky/i18n';
 import type { AppLanguage } from '@pallinky/i18n/types';
-import QRCode from 'react-native-qrcode-svg';
+
 import FriendCard, { FriendCardData } from '../../components/people/FriendCard';
 import CircleManagerSheet from '../../components/circles/CircleManagerSheet';
 import type {
@@ -45,6 +39,13 @@ type CircleRow = {
   created_at?: string | null;
 };
 
+type SocialIntentRow = {
+  host_email: string | null;
+  updated_at?: string | null;
+};
+
+type PeopleTab = 'connections' | 'circles';
+
 const COLORS = {
   background: '#F6F7F9',
   surface: '#FFFFFF',
@@ -57,8 +58,6 @@ const COLORS = {
   secondarySoft: '#f6f0fb',
   border: '#eef2ea',
   borderStrong: '#bac9ad',
-  danger: '#e63946',
-  dangerBorder: '#ffd6d6',
   iconBg: '#f1f3eb',
   overlay: 'rgba(31, 42, 27, 0.28)',
 };
@@ -66,11 +65,6 @@ const COLORS = {
 function normalizeEmail(v: unknown) {
   return typeof v === 'string' ? v.toLowerCase().trim() : '';
 }
-
-type SocialIntentRow = {
-  host_email: string | null;
-  updated_at?: string | null;
-};
 
 function formatDate(date: string | null | undefined) {
   if (!date) return '';
@@ -121,14 +115,16 @@ function buildFriendCardFromSignal(
   const profile = profileMap.get(email);
 
   const name =
-    profile?.name ||
-    payload?.name ||
-    payload?.full_name ||
-    email.split('@')[0] ||
-    t(lang, 'people_person_fallback');
+  profile?.name ||
+  payload?.full_name ||
+  payload?.name ||
+  payload?.displayName ||
+  email.split('@')[0] ||
+  t(lang, 'people_person_fallback');
 
   const sharedEvents = Number(payload?.sharedEvents || 0);
   const lastSeenAt = payload?.lastSeenAt || null;
+
   const bridgeNames = Array.isArray(payload?.bridges)
     ? payload.bridges
         .map((bridge: any) => {
@@ -138,25 +134,23 @@ function buildFriendCardFromSignal(
         })
         .filter(Boolean)
     : [];
-  const mutualBridgeCount = Number(payload?.mutualBridgeCount || bridgeNames.length || 0);
 
-  const isFutureEvent =
-  payload?.lastSeenAt &&
-  new Date(payload.lastSeenAt).getTime() > Date.now();
+  const mutualBridgeCount = Number(
+    payload?.mutualBridgeCount || bridgeNames.length || 0
+  );
 
-const lastSeenEventTitle =
-  signal.type === 'suggested_connection' && payload?.reason === 'friend_of_friend'
-    ? bridgeNames.length > 1
-      ? t(lang, 'people_you_both_know_plus_others', {
-          name: bridgeNames[0],
-          count: String(bridgeNames.length - 1),
-        })
-      : bridgeNames.length === 1
-        ? t(lang, 'people_you_both_know', { name: bridgeNames[0] })
-        : t(lang, 'people_connected_through_network')
-    : isFutureEvent
-      ? `Going to ${payload?.lastSeenEventTitle || t(lang, 'people_event_fallback')}`
+  const lastSeenEventTitle =
+    signal.type === 'suggested_connection' && payload?.reason === 'friend_of_friend'
+      ? bridgeNames.length > 1
+        ? t(lang, 'people_you_both_know_plus_others', {
+            name: bridgeNames[0],
+            count: String(bridgeNames.length - 1),
+          })
+        : bridgeNames.length === 1
+          ? t(lang, 'people_you_both_know', { name: bridgeNames[0] })
+          : t(lang, 'people_connected_through_network')
       : payload?.lastSeenEventTitle || t(lang, 'people_event_fallback');
+
   return {
     id: email,
     name,
@@ -203,8 +197,8 @@ function sortBySharedEventsDesc(items: FeedItem[]) {
 
 function sortByLastSeenDesc(items: FeedItem[]) {
   return [...items].sort((a, b) => {
-    const aMs = a.payload?.lastSeenAt ? new Date(a.payload?.lastSeenAt).getTime() : 0;
-    const bMs = b.payload?.lastSeenAt ? new Date(b.payload?.lastSeenAt).getTime() : 0;
+    const aMs = a.payload?.lastSeenAt ? new Date(a.payload.lastSeenAt).getTime() : 0;
+    const bMs = b.payload?.lastSeenAt ? new Date(b.payload.lastSeenAt).getTime() : 0;
     if (bMs !== aMs) return bMs - aMs;
 
     const aCount = Number(a.payload?.sharedEvents || 0);
@@ -218,25 +212,24 @@ export default function PeopleScreen() {
   const { session } = useSession();
   const lang: AppLanguage = 'en';
 
+  const [activeTab, setActiveTab] = useState<PeopleTab>('connections');
   const [loading, setLoading] = useState(true);
   const [deviceContactCount, setDeviceContactCount] = useState(0);
 
   const [data, setData] = useState<any>({
-  events: [],
-  rsvps: [],
-  invites: [],
-  socialCircles: [] as Circle[],
-  relationships: [],
-  socialIntent: [],
-  contacts: [],
-  chatSummaries: {},
-  accessByEventId: {},
-  userEmail: '',
-});
+    events: [],
+    rsvps: [],
+    invites: [],
+    socialCircles: [] as Circle[],
+    relationships: [],
+    socialIntent: [],
+    contacts: [],
+    chatSummaries: {},
+    accessByEventId: {},
+    userEmail: '',
+  });
 
   const [profileMap, setProfileMap] = useState<Map<string, PersonProfile>>(new Map());
-const [myProfile, setMyProfile] = useState<{ id: string; full_name?: string | null; avatar_url?: string | null } | null>(null);
-const [qrVisible, setQrVisible] = useState(false);
   const [selectedFriend, setSelectedFriend] = useState<FriendCardData | null>(null);
 
   const [circleManagerVisible, setCircleManagerVisible] = useState(false);
@@ -248,23 +241,20 @@ const [qrVisible, setQrVisible] = useState(false);
     setSelectedFriend(card);
   }
 
-  const setSocialCircles = useCallback(
-    (updater: React.SetStateAction<Circle[]>) => {
-      setData((prev: any) => {
-        const current = Array.isArray(prev.socialCircles) ? prev.socialCircles : [];
-        const next =
-          typeof updater === 'function'
-            ? (updater as (prevState: Circle[]) => Circle[])(current)
-            : updater;
+  const setSocialCircles = useCallback((updater: React.SetStateAction<Circle[]>) => {
+    setData((prev: any) => {
+      const current = Array.isArray(prev.socialCircles) ? prev.socialCircles : [];
+      const next =
+        typeof updater === 'function'
+          ? (updater as (prevState: Circle[]) => Circle[])(current)
+          : updater;
 
-        return {
-          ...prev,
-          socialCircles: next,
-        };
-      });
-    },
-    []
-  );
+      return {
+        ...prev,
+        socialCircles: next,
+      };
+    });
+  }, []);
 
   const openCreateCircle = useCallback(() => {
     setCircleManagerMode('create');
@@ -307,39 +297,37 @@ const [qrVisible, setQrVisible] = useState(false);
       setDeviceContactCount(nextDeviceContactCount);
 
       const { data: profile } = await supabase
-  .from('profiles')
-  .select('id, full_name, avatar_url')
-  .eq('id', session.user.id)
-  .maybeSingle();
+        .from('profiles')
+        .select('id, full_name, avatar_url')
+        .eq('id', session.user.id)
+        .maybeSingle();
 
-setMyProfile(profile || null);
+      const { data: relationshipRows, error: relationshipError } = await supabase
+        .from('relationships')
+        .select(`
+          related_person_id,
+          source,
+          people:related_person_id (
+            id,
+            email_lc,
+            matched_user_id
+          )
+        `)
+        .eq('owner_user_id', session.user.id)
+        .eq('relationship_type', 'direct');
 
-const { data: relationshipRows, error: relationshipError } = await supabase
-  .from('relationships')
-  .select(`
-    related_person_id,
-    source,
-    people:related_person_id (
-      id,
-      email_lc,
-      matched_user_id
-    )
-  `)
-  .eq('owner_user_id', session.user.id)
-  .eq('relationship_type', 'direct');
+      if (relationshipError) throw relationshipError;
 
-if (relationshipError) throw relationshipError;
+      const directRelationshipEmails = Array.from(
+        new Set(
+          (relationshipRows || [])
+            .map((row: any) => normalizeEmail(row.people?.email_lc))
+            .filter((email: string) => email && email !== emailLower)
+        )
+      );
 
-const directRelationshipEmails = Array.from(
-  new Set(
-    (relationshipRows || [])
-      .map((row: any) => normalizeEmail(row.people?.email_lc))
-      .filter((email: string) => email && email !== emailLower)
-  )
-);
-
-const [
-  hostedEventsRes,
+      const [
+        hostedEventsRes,
         invitesRes,
         myRsvpsRes,
         circlesRes,
@@ -353,10 +341,7 @@ const [
           .select('event_id, invitee_email_lc, status')
           .eq('invitee_email_lc', emailLower),
 
-        supabase
-          .from('rsvps')
-          .select('*')
-          .eq('email_lc', emailLower),
+        supabase.from('rsvps').select('*').eq('email_lc', emailLower),
 
         profile?.id
           ? supabase
@@ -436,14 +421,14 @@ const [
       }
 
       const relatedHostEmails = Array.from(
-  new Set([
-    ...directRelationshipEmails,
-    ...circleMemberEmails,
-    ...sharedHistoryRsvps
-      .map((r: any) => normalizeEmail(r.email_lc || r.email))
-      .filter((email: string) => email && email !== emailLower),
-  ])
-);
+        new Set([
+          ...directRelationshipEmails,
+          ...circleMemberEmails,
+          ...sharedHistoryRsvps
+            .map((r: any) => normalizeEmail(r.email_lc || r.email))
+            .filter((email: string) => email && email !== emailLower),
+        ])
+      );
 
       let relatedHostedEvents: any[] = [];
       if (relatedHostEmails.length > 0) {
@@ -506,11 +491,7 @@ const [
       }
 
       const secondDegreeEventIds = Array.from(
-        new Set(
-          secondDegreeBridgeRsvps
-            .map((r: any) => r.event_id)
-            .filter(Boolean)
-        )
+        new Set(secondDegreeBridgeRsvps.map((r: any) => r.event_id).filter(Boolean))
       );
 
       let secondDegreeEvents: any[] = [];
@@ -563,20 +544,20 @@ const [
 
       const chatSummaries = Object.fromEntries(chatSummaryPairs);
 
-     const nextData = {
-  events: allEvents,
-  rsvps: eventRsvps,
-  invites: invitesRes.data || [],
-  socialCircles,
-  relationships: relationshipRows || [],
-  socialIntent: socialIntentRes.data || [],
-  contacts: deviceContactsRes.data || [],
-  chatSummaries,
-  accessByEventId: Object.fromEntries(
-    allEvents.map((ev: any) => [String(ev.id), { can_see: true }])
-  ),
-  userEmail: emailLower,
-};
+      const nextData = {
+        events: allEvents,
+        rsvps: eventRsvps,
+        invites: invitesRes.data || [],
+        socialCircles,
+        relationships: relationshipRows || [],
+        socialIntent: socialIntentRes.data || [],
+        contacts: deviceContactsRes.data || [],
+        chatSummaries,
+        accessByEventId: Object.fromEntries(
+          allEvents.map((ev: any) => [String(ev.id), { can_see: true }])
+        ),
+        userEmail: emailLower,
+      };
 
       setData(nextData);
 
@@ -589,9 +570,7 @@ const [
 
       const socialIntentHostEmails = Array.from(
         new Set(
-          socialIntentRows
-            .map((row) => normalizeEmail(row.host_email))
-            .filter(Boolean)
+          socialIntentRows.map((row) => normalizeEmail(row.host_email)).filter(Boolean)
         )
       );
 
@@ -613,6 +592,7 @@ const [
                   const participants = Array.isArray(item.payload?.participants)
                     ? item.payload.participants
                     : [];
+
                   return participants
                     .map((p: any) => normalizeEmail(p.personEmail))
                     .filter(Boolean);
@@ -621,10 +601,10 @@ const [
                 return [];
               })
               .filter(Boolean),
-           ...socialIntentHostEmails,
-...circleMemberEmails,
-...directRelationshipEmails,
-          ]
+            ...socialIntentHostEmails,
+            ...circleMemberEmails,
+            ...directRelationshipEmails,
+          ].filter(Boolean)
         )
       );
 
@@ -647,7 +627,10 @@ const [
 
         nextProfileMap.set(email, {
           email,
-          name: profileRow?.full_name || email.split('@')[0] || t(lang, 'people_person_fallback'),
+          name:
+            profileRow?.full_name ||
+            email.split('@')[0] ||
+            t(lang, 'people_person_fallback'),
           avatarUrl: profileRow?.avatar_url || null,
         });
       }
@@ -670,50 +653,54 @@ const [
       deviceContactCount,
     });
   }, [data, deviceContactCount]);
-const socialCircles = useMemo(() => {
-  return (Array.isArray(data.socialCircles) ? data.socialCircles : []) as Circle[];
-}, [data.socialCircles]);
 
-const directRelationshipEmailSet = useMemo(() => {
-  return new Set(
-    (Array.isArray(data.relationships) ? data.relationships : [])
-      .map((row: any) => normalizeEmail(row.people?.email_lc))
-      .filter(Boolean)
-  );
-}, [data.relationships]);
+  const socialCircles = useMemo(() => {
+    return (Array.isArray(data.socialCircles) ? data.socialCircles : []) as Circle[];
+  }, [data.socialCircles]);
 
-const innerCircleSignals = useMemo(() => {
-  return sortBySharedEventsDesc(
-    dedupeByPerson(
-      feed.items.filter(
-        (item) =>
-          item.type === 'inner_circle_person' &&
-          directRelationshipEmailSet.has(normalizeEmail(item.personEmail))
+  const directRelationshipEmailSet = useMemo(() => {
+    return new Set(
+      (Array.isArray(data.relationships) ? data.relationships : [])
+        .map((row: any) => normalizeEmail(row.people?.email_lc))
+        .filter(Boolean)
+    );
+  }, [data.relationships]);
+
+  const innerCircleSignals = useMemo(() => {
+    return sortBySharedEventsDesc(
+      dedupeByPerson(
+        feed.items.filter((item) => {
+          const email = normalizeEmail(item.personEmail);
+
+          return (
+            item.type === 'inner_circle_person' &&
+            directRelationshipEmailSet.has(email)
+          );
+        })
       )
-    )
-  ).slice(0, 6);
-}, [feed.items, directRelationshipEmailSet]);
+    ).slice(0, 6);
+  }, [feed.items, directRelationshipEmailSet]);
 
   const innerCircleEmails = useMemo(() => {
     return new Set(innerCircleSignals.map((item) => normalizeEmail(item.personEmail)));
   }, [innerCircleSignals]);
 
-  const seeingSoonSignals = useMemo(() => {
-    return feed.items.filter((item) => item.type === 'seeing_soon');
-  }, [feed.items]);
-
   const activeConnectionSignals = useMemo(() => {
-  return sortByLastSeenDesc(
-    dedupeByPerson(
-      feed.items.filter(
-        (item) =>
-          item.type === 'active_connection' &&
-          Number(item.payload?.sharedEvents || 0) > 0 &&
-          !innerCircleEmails.has(normalizeEmail(item.personEmail))
+    return sortByLastSeenDesc(
+      dedupeByPerson(
+        feed.items.filter((item) => {
+          const email = normalizeEmail(item.personEmail);
+          const sharedEvents = Number(item.payload?.sharedEvents || 0);
+
+          return (
+            item.type === 'active_connection' &&
+            sharedEvents > 0 &&
+            !innerCircleEmails.has(email)
+          );
+        })
       )
-    )
-  ).slice(0, 15);
-}, [feed.items, innerCircleEmails]);
+    ).slice(0, 15);
+  }, [feed.items, innerCircleEmails]);
 
   const reconnectCards = useMemo(() => {
     return sortByLastSeenDesc(
@@ -728,46 +715,61 @@ const innerCircleSignals = useMemo(() => {
   }, [reconnectCards]);
 
   const activeConnectionEmails = useMemo(() => {
-    return new Set(
-      activeConnectionSignals.map((item) => normalizeEmail(item.personEmail))
-    );
+    return new Set(activeConnectionSignals.map((item) => normalizeEmail(item.personEmail)));
   }, [activeConnectionSignals]);
-
+const sharedHistoryEmailSet = useMemo(() => {
+  return new Set(
+    feed.items
+      .filter((item) => Number(item.payload?.sharedEvents || 0) > 0)
+      .map((item) => normalizeEmail(item.personEmail))
+      .filter(Boolean)
+  );
+}, [feed.items]);
   const suggestedCards = useMemo(() => {
     return dedupeByPerson(
       [...feed.items]
-        .filter(
-          (item) =>
+        .filter((item) => {
+          const email = normalizeEmail(item.personEmail);
+          const sharedEvents = Number(item.payload?.sharedEvents || 0);
+
+          return (
             item.type === 'suggested_connection' &&
-            !innerCircleEmails.has(normalizeEmail(item.personEmail)) &&
-            !reconnectEmails.has(normalizeEmail(item.personEmail)) &&
-            !activeConnectionEmails.has(normalizeEmail(item.personEmail))
-        )
+            item.payload?.reason === 'friend_of_friend' &&
+            sharedEvents === 0 &&
+            !innerCircleEmails.has(email) &&
+            !reconnectEmails.has(email) &&
+            !activeConnectionEmails.has(email) &&
+!sharedHistoryEmailSet.has(email)
+          );
+        })
         .sort((a, b) => {
           const aScore =
             (a.payload?.reason === 'friend_of_friend' ? 100 : 0) +
             (Array.isArray(a.payload?.bridges) ? a.payload.bridges.length : 0) +
-            (Number(a.payload?.mutualBridgeCount || 0) * 10);
+            Number(a.payload?.mutualBridgeCount || 0) * 10;
 
           const bScore =
             (b.payload?.reason === 'friend_of_friend' ? 100 : 0) +
             (Array.isArray(b.payload?.bridges) ? b.payload.bridges.length : 0) +
-            (Number(b.payload?.mutualBridgeCount || 0) * 10);
+            Number(b.payload?.mutualBridgeCount || 0) * 10;
 
           return bScore - aScore;
         })
     ).map((item) => buildFriendCardFromSignal(item, profileMap, lang));
-  }, [feed.items, innerCircleEmails, reconnectEmails, activeConnectionEmails, profileMap]);
+  }, [
+  feed.items,
+  innerCircleEmails,
+  reconnectEmails,
+  activeConnectionEmails,
+  sharedHistoryEmailSet,
+  profileMap,
+]);
 
   const socialIntentCards = useMemo(() => {
     const rows = (Array.isArray(data.socialIntent) ? data.socialIntent : []) as SocialIntentRow[];
 
     const dedupedHostEmails = Array.from(
-      new Set(
-        rows
-          .map((row: any) => normalizeEmail(row.host_email))
-          .filter(Boolean)
-      )
+      new Set(rows.map((row: any) => normalizeEmail(row.host_email)).filter(Boolean))
     );
 
     return dedupedHostEmails
@@ -806,169 +808,140 @@ const innerCircleSignals = useMemo(() => {
 
   const hasAnyPeopleContent =
     innerCircleSignals.length > 0 ||
-    seeingSoonSignals.length > 0 ||
     activeConnectionSignals.length > 0 ||
     reconnectCards.length > 0 ||
     suggestedCards.length > 0 ||
     socialIntentCards.length > 0;
-const myDisplayName =
-  myProfile?.full_name?.trim() ||
-  session?.user?.email?.split('@')[0] ||
-  t(lang, 'people_person_fallback');
 
-const myQrValue = myProfile?.id
-  ? `https://pallinky.com/add?profileId=${myProfile.id}`
-  : '';
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <StyledText style={styles.headerTitle}>{t(lang, 'people_header_title')}</StyledText>
       </View>
 
-      <View style={{ height: 10 }} />
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator color={COLORS.primary} />
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.tabsWrap}>
+            <Pressable
+              onPress={() => setActiveTab('connections')}
+              style={[
+                styles.tabPill,
+                activeTab === 'connections' && styles.tabPillActive,
+              ]}
+            >
+              <StyledText
+                style={[
+                  styles.tabPillText,
+                  activeTab === 'connections' && styles.tabPillTextActive,
+                ]}
+              >
+                {t(lang, 'people_tab_connections')}
+              </StyledText>
+            </Pressable>
 
-      <>
-        {loading ? (
-          <View style={styles.center}>
-            <ActivityIndicator color={COLORS.primary} />
+            <Pressable
+              onPress={() => setActiveTab('circles')}
+              style={[
+                styles.tabPill,
+                activeTab === 'circles' && styles.tabPillActive,
+              ]}
+            >
+              <StyledText
+                style={[
+                  styles.tabPillText,
+                  activeTab === 'circles' && styles.tabPillTextActive,
+                ]}
+              >
+                {t(lang, 'people_tab_circles')}
+              </StyledText>
+            </Pressable>
           </View>
-        ) : (
-         <ScrollView contentContainerStyle={styles.scrollContent}>
-  <AddMeQrCard
-    lang={lang}
-    disabled={!myQrValue}
-    onPress={() => setQrVisible(true)}
-  />
 
-  <CirclesSection
+          {activeTab === 'circles' ? (
+            <CirclesSection
               circles={socialCircles}
               profileMap={profileMap}
               lang={lang}
               onPressNewCircle={openCreateCircle}
               onPressCircle={openManageCircle}
             />
+          ) : hasAnyPeopleContent ? (
+            <>
+              {innerCircleSignals.length > 0 && (
+                <PeopleAvatarSection
+                  title={t(lang, 'people_closest_connections_title')}
+                  subtitle={t(lang, 'people_closest_connections_subtitle')}
+                  items={innerCircleSignals}
+                  profileMap={profileMap}
+                  showCountBadge
+                  onPressPerson={handleOpenFriend}
+                />
+              )}
 
-            {hasAnyPeopleContent ? (
-              <>
-                {innerCircleSignals.length > 0 && (
-                  <PeopleAvatarSection
-                    title={t(lang, 'people_closest_connections_title')}
-                    subtitle={t(lang, 'people_closest_connections_subtitle')}
-                    items={innerCircleSignals}
-                    profileMap={profileMap}
-                    showCountBadge
-                    onPressPerson={handleOpenFriend}
-                  />
-                )}
+              {activeConnectionSignals.length > 0 && (
+                <PeopleAvatarSection
+                  title={t(lang, 'people_recent_connections_title')}
+                  subtitle={t(lang, 'people_recent_connections_subtitle')}
+                  items={activeConnectionSignals}
+                  profileMap={profileMap}
+                  showCountBadge
+                  onPressPerson={handleOpenFriend}
+                />
+              )}
 
-                {seeingSoonSignals.length > 0 && (
-                  <SeeingSoonSection
-                    items={seeingSoonSignals}
-                    profileMap={profileMap}
-                    lang={lang}
-                  />
-                )}
+              {reconnectCards.length > 0 && (
+                <CardSection
+                  title={t(lang, 'people_reconnect_title')}
+                  subtitle={t(lang, 'people_reconnect_subtitle')}
+                  cards={reconnectCards}
+                   lang={lang}
+                />
+              )}
 
-                {activeConnectionSignals.length > 0 && (
-                  <PeopleAvatarSection
-                    title={t(lang, 'people_recent_connections_title')}
-                    subtitle={t(lang, 'people_recent_connections_subtitle')}
-                    items={activeConnectionSignals}
-                    profileMap={profileMap}
-                    showCountBadge
-                    onPressPerson={handleOpenFriend}
-                  />
-                )}
+              {socialIntentCards.length > 0 && (
+                <CardSection
+                  title={t(lang, 'people_want_to_hear_from_title')}
+                  subtitle={t(lang, 'people_want_to_hear_from_subtitle')}
+                  cards={socialIntentCards}
+                   lang={lang}
+                />
+              )}
 
-                {reconnectCards.length > 0 && (
-                  <CardSection
-                    title={t(lang, 'people_reconnect_title')}
-                    subtitle={t(lang, 'people_reconnect_subtitle')}
-                    cards={reconnectCards}
-                  />
-                )}
+              {suggestedCards.length > 0 && (
+                <CardSection
+                  title={t(lang, 'people_second_degree_title')}
+                  subtitle={t(lang, 'people_second_degree_subtitle')}
+                  cards={suggestedCards}
+                   lang={lang}
+                />
+              )}
+            </>
+          ) : (
+            <EmptyPeopleState
+              lang={lang}
+              onPressCreate={() => router.push('/create' as any)}
+            />
+          )}
 
-                {socialIntentCards.length > 0 && (
-                  <CardSection
-                    title={t(lang, 'people_want_to_hear_from_title')}
-                    subtitle={t(lang, 'people_want_to_hear_from_subtitle')}
-                    cards={socialIntentCards}
-                  />
-                )}
-
-                {suggestedCards.length > 0 && (
-                  <CardSection
-                    title={t(lang, 'people_second_degree_title')}
-                    subtitle={t(lang, 'people_second_degree_subtitle')}
-                    cards={suggestedCards}
-                  />
-                )}
-              </>
-            ) : (
-              <EmptyPeopleState
-                lang={lang}
-                onPressCreate={() => router.push('/create' as any)}
-              />
-            )}
-
-            <View style={{ height: 80 }} />
-          </ScrollView>
-        )}
-      </>
+          <View style={{ height: 80 }} />
+        </ScrollView>
+      )}
 
       {selectedFriend && (
         <Pressable
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: COLORS.overlay,
-            justifyContent: 'center',
-            padding: 20,
-          }}
+          style={styles.friendOverlay}
           onPress={() => setSelectedFriend(null)}
         >
           <View onStartShouldSetResponder={() => true}>
-            <FriendCard friend={selectedFriend} />
+            <FriendCard friend={selectedFriend} lang={lang} />
           </View>
         </Pressable>
       )}
-<Modal visible={qrVisible} transparent animationType="fade">
-  <Pressable style={styles.qrOverlay} onPress={() => setQrVisible(false)}>
-    <Pressable style={styles.qrCard}>
-      <Pressable style={styles.qrClose} onPress={() => setQrVisible(false)}>
-        <StyledText style={styles.qrCloseText}>×</StyledText>
-      </Pressable>
 
-      <Image
-        source={{
-          uri:
-            myProfile?.avatar_url ||
-            `https://ui-avatars.com/api/?name=${encodeURIComponent(
-              myDisplayName
-            )}&background=43691b&color=fff`,
-        }}
-        style={styles.qrAvatar}
-      />
-
-      <StyledText style={styles.qrTitle}>
-        {t(lang, 'people_qr_modal_title', { name: myDisplayName })}
-      </StyledText>
-
-      <StyledText style={styles.qrSubtitle}>
-        {t(lang, 'people_qr_modal_subtitle')}
-      </StyledText>
-
-      {myQrValue ? (
-        <View style={styles.qrBox}>
-          <QRCode value={myQrValue} size={220} />
-        </View>
-      ) : null}
-    </Pressable>
-  </Pressable>
-</Modal>
       {!!session?.user?.id && (
         <CircleManagerSheet
           visible={circleManagerVisible}
@@ -983,38 +956,7 @@ const myQrValue = myProfile?.id
     </SafeAreaView>
   );
 }
-function AddMeQrCard({
-  lang,
-  disabled,
-  onPress,
-}: {
-  lang: AppLanguage;
-  disabled: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      disabled={disabled}
-      onPress={onPress}
-      style={[styles.addMeCard, disabled && { opacity: 0.5 }]}
-    >
-      <View>
-        <StyledText style={styles.addMeTitle}>
-          {t(lang, 'people_qr_card_title')}
-        </StyledText>
-        <StyledText style={styles.addMeSubtitle}>
-          {t(lang, 'people_qr_card_subtitle')}
-        </StyledText>
-      </View>
 
-      <View style={styles.addMeButton}>
-        <StyledText style={styles.addMeButtonText}>
-          {t(lang, 'people_qr_card_button')}
-        </StyledText>
-      </View>
-    </Pressable>
-  );
-}
 function CirclesSection({
   circles,
   profileMap,
@@ -1028,6 +970,10 @@ function CirclesSection({
   onPressNewCircle: () => void;
   onPressCircle: (circle: Circle) => void;
 }) {
+  const sortedCircles = [...circles].sort((a, b) => {
+    return (b.members?.length || 0) - (a.members?.length || 0);
+  });
+
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
@@ -1037,108 +983,118 @@ function CirclesSection({
         </StyledText>
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.circlesRow}
-      >
-        <Pressable style={styles.newCircleCard} onPress={onPressNewCircle}>
-          <View style={styles.newCircleIcon}>
-            <StyledText style={styles.newCirclePlus}>+</StyledText>
-          </View>
-          <StyledText style={styles.newCircleTitle}>{t(lang, 'people_new_circle_title')}</StyledText>
+      <Pressable style={styles.newCircleRow} onPress={onPressNewCircle}>
+        <View style={styles.newCircleIcon}>
+          <StyledText style={styles.newCirclePlus}>+</StyledText>
+        </View>
+
+        <View style={{ flex: 1 }}>
+          <StyledText style={styles.newCircleTitle}>
+            {t(lang, 'people_new_circle_title')}
+          </StyledText>
           <StyledText style={styles.newCircleBody}>
             {t(lang, 'people_new_circle_body')}
           </StyledText>
-        </Pressable>
+        </View>
+      </Pressable>
 
-        {circles.map((circle) => {
+      <View style={styles.circleList}>
+        {sortedCircles.map((circle) => {
           const previewMembers = circle.members.slice(0, 3);
           const overflowCount = Math.max(0, circle.members.length - previewMembers.length);
 
           return (
-            <View key={circle.id} style={styles.circleCard}>
+            <View key={circle.id} style={styles.circleRowCard}>
               <Pressable
-                style={styles.circleCardMain}
+                style={styles.circleRowMain}
                 onPress={() => onPressCircle(circle)}
               >
-                <View style={styles.circleCardTop}>
-                  <View style={styles.circleBadge}>
-                    <StyledText style={styles.circleBadgeText}>
-                      {initialsFor(circle.circle_name)}
-                    </StyledText>
-                  </View>
-
-                  <StyledText style={styles.circleMemberCount}>
-                    {circle.members.length}{' '}
-                    {circle.members.length === 1
-                      ? t(lang, 'people_member_singular')
-                      : t(lang, 'people_member_plural')}
+                <View style={styles.circleBadge}>
+                  <StyledText style={styles.circleBadgeText}>
+                    {initialsFor(circle.circle_name)}
                   </StyledText>
                 </View>
 
-                <StyledText numberOfLines={1} style={styles.circleTitle}>
-                  {circle.circle_name || t(lang, 'people_untitled_circle')}
-                </StyledText>
+                <View style={styles.circleRowContent}>
+                  <View style={styles.circleRowHeader}>
+                    <StyledText numberOfLines={1} style={styles.circleTitle}>
+                      {circle.circle_name || t(lang, 'people_untitled_circle')}
+                    </StyledText>
 
-                {previewMembers.length > 0 ? (
-                  <>
-                    <View style={styles.circlePreviewRow}>
-                      {previewMembers.map((member, index) => {
-                        const email = normalizeEmail(member.member_email_lc);
-                        const profile = email ? profileMap.get(email) : null;
-                        const displayName = getCircleMemberDisplayName(member, profileMap, lang);
-                        const avatarUrl = profile?.avatarUrl || null;
+                    <StyledText style={styles.circleMemberCount}>
+                      {circle.members.length}{' '}
+                      {circle.members.length === 1
+                        ? t(lang, 'people_member_singular')
+                        : t(lang, 'people_member_plural')}
+                    </StyledText>
+                  </View>
 
-                        return (
+                  {previewMembers.length > 0 ? (
+                    <>
+                      <View style={styles.circlePreviewRow}>
+                        {previewMembers.map((member, index) => {
+                          const email = normalizeEmail(member.member_email_lc);
+                          const profile = email ? profileMap.get(email) : null;
+                          const displayName = getCircleMemberDisplayName(
+                            member,
+                            profileMap,
+                            lang
+                          );
+
+                          return (
+                            <View
+                              key={member.id}
+                              style={[
+                                styles.circlePreviewAvatarWrap,
+                                index > 0 && styles.circlePreviewAvatarOverlap,
+                              ]}
+                            >
+                              {profile?.avatarUrl ? (
+                                <Image
+                                  source={{
+                                    uri: avatarFor(displayName, profile.avatarUrl),
+                                  }}
+                                  style={styles.circlePreviewAvatar}
+                                />
+                              ) : (
+                                <View style={styles.circlePreviewFallback}>
+                                  <StyledText style={styles.circlePreviewFallbackText}>
+                                    {initialsFor(displayName)}
+                                  </StyledText>
+                                </View>
+                              )}
+                            </View>
+                          );
+                        })}
+
+                        {overflowCount > 0 && (
                           <View
-                            key={member.id}
                             style={[
-                              styles.circlePreviewAvatarWrap,
-                              index > 0 && styles.circlePreviewAvatarOverlap,
+                              styles.circlePreviewOverflow,
+                              styles.circlePreviewAvatarOverlap,
                             ]}
                           >
-                            {avatarUrl ? (
-                              <Image
-                                source={{ uri: avatarFor(displayName, avatarUrl) }}
-                                style={styles.circlePreviewAvatar}
-                              />
-                            ) : (
-                              <View style={styles.circlePreviewFallback}>
-                                <StyledText style={styles.circlePreviewFallbackText}>
-                                  {initialsFor(displayName)}
-                                </StyledText>
-                              </View>
-                            )}
+                            <StyledText style={styles.circlePreviewOverflowText}>
+                              +{overflowCount}
+                            </StyledText>
                           </View>
-                        );
-                      })}
+                        )}
+                      </View>
 
-                      {overflowCount > 0 && (
-                        <View
-                          style={[
-                            styles.circlePreviewOverflow,
-                            styles.circlePreviewAvatarOverlap,
-                          ]}
-                        >
-                          <StyledText style={styles.circlePreviewOverflowText}>
-                            +{overflowCount}
-                          </StyledText>
-                        </View>
-                      )}
-                    </View>
-
-                    <StyledText numberOfLines={1} style={styles.circlePreviewNames}>
-                      {previewMembers
-                        .map((member) => getCircleMemberDisplayName(member, profileMap, lang))
-                        .join(', ')}
+                      <StyledText numberOfLines={1} style={styles.circlePreviewNames}>
+                        {previewMembers
+                          .map((member) =>
+                            getCircleMemberDisplayName(member, profileMap, lang)
+                          )
+                          .join(', ')}
+                      </StyledText>
+                    </>
+                  ) : (
+                    <StyledText style={styles.circleEmptyText}>
+                      {t(lang, 'people_no_members_yet')}
                     </StyledText>
-                  </>
-                ) : (
-                  <StyledText style={styles.circleEmptyText}>
-                    {t(lang, 'people_no_members_yet')}
-                  </StyledText>
-                )}
+                  )}
+                </View>
               </Pressable>
 
               <Pressable
@@ -1152,7 +1108,7 @@ function CirclesSection({
             </View>
           );
         })}
-      </ScrollView>
+      </View>
     </View>
   );
 }
@@ -1184,16 +1140,31 @@ function PeopleAvatarSection({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.avatarRow}
       >
-        {items.map((item) => {
+        {[...items]
+  .sort((a, b) => {
+    const aProfile = profileMap.get(normalizeEmail(a.personEmail));
+    const bProfile = profileMap.get(normalizeEmail(b.personEmail));
+
+    if (!!bProfile?.avatarUrl !== !!aProfile?.avatarUrl) {
+      return Number(!!bProfile?.avatarUrl) - Number(!!aProfile?.avatarUrl);
+    }
+
+    const aName = aProfile?.name || a.payload?.name || '';
+    const bName = bProfile?.name || b.payload?.name || '';
+
+    return aName.localeCompare(bName);
+  })
+  .map((item) => {
           const email = normalizeEmail(item.personEmail);
           const profile = profileMap.get(email);
           const name =
-            profile?.name ||
-            item.payload?.name ||
-            email.split('@')[0] ||
-            'Person';
+  profile?.name ||
+  item.payload?.full_name ||
+  item.payload?.name ||
+  item.payload?.displayName ||
+  email.split('@')[0] ||
+  'Person';
 
-          const avatarUrl = profile?.avatarUrl || null;
           const sharedEvents = Number(item.payload?.sharedEvents || 0);
 
           return (
@@ -1204,10 +1175,10 @@ function PeopleAvatarSection({
             >
               <View style={styles.avatarWrap}>
                 <Image
-                  source={{ uri: avatarFor(name, avatarUrl) }}
+                  source={{ uri: avatarFor(name, profile?.avatarUrl) }}
                   style={styles.avatarImage}
                 />
-                {showCountBadge && (
+                {showCountBadge && sharedEvents > 0 && (
                   <View style={styles.avatarCountBadge}>
                     <StyledText style={styles.avatarCountText}>
                       {sharedEvents}
@@ -1227,103 +1198,16 @@ function PeopleAvatarSection({
   );
 }
 
-function SeeingSoonSection({
-  items,
-  profileMap,
-  lang,
-}: {
-  items: FeedItem[];
-  profileMap: Map<string, PersonProfile>;
-  lang: AppLanguage;
-}) {
-  const [openIds, setOpenIds] = useState<string[]>([]);
-
-  function toggle(id: string) {
-    setOpenIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  }
-
-  return (
-    <View style={styles.section}>
-      <View style={styles.sectionHeader}>
-        <StyledText style={styles.sectionTitle}>{t(lang, 'people_seeing_soon_title')}</StyledText>
-        <StyledText style={styles.sectionSubtitle}>
-          {t(lang, 'people_seeing_soon_subtitle')}
-        </StyledText>
-      </View>
-
-      <View style={styles.cardsWrap}>
-        {items.map((item) => {
-          const isOpen = openIds.includes(item.id);
-          const event = item.payload?.event;
-          const participants = Array.isArray(item.payload?.participants)
-            ? item.payload.participants
-            : [];
-
-          return (
-            <View key={item.id} style={styles.seeingSoonCard}>
-              <Pressable
-                onPress={() => toggle(item.id)}
-                style={styles.seeingSoonHeader}
-              >
-                <View style={styles.seeingSoonHeaderText}>
-                  <StyledText style={styles.seeingSoonTitle}>
-                    {event?.title || t(lang, 'people_upcoming_event_fallback')}
-                  </StyledText>
-                  {!!event?.starts_at && (
-                    <StyledText style={styles.seeingSoonDate}>
-                      {formatDate(event.starts_at)}
-                    </StyledText>
-                  )}
-                </View>
-
-                <StyledText style={styles.seeingSoonArrow}>
-                  {isOpen ? '▴' : '▾'}
-                </StyledText>
-              </Pressable>
-
-              {isOpen && (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.avatarRow}
-                >
-                  {participants.map((p: any, index: number) => {
-                    const email = normalizeEmail(p.personEmail);
-                    const profile = profileMap.get(email);
-                    const name = profile?.name || email.split('@')[0] || t(lang, 'people_person_fallback');
-
-                    return (
-                      <View key={`${item.id}:${email || index}`} style={styles.avatarItem}>
-                        <Image
-                          source={{ uri: avatarFor(name, profile?.avatarUrl) }}
-                          style={styles.avatarImage}
-                        />
-                        <StyledText numberOfLines={1} style={styles.avatarName}>
-                          {name}
-                        </StyledText>
-                      </View>
-                    );
-                  })}
-                </ScrollView>
-              )}
-            </View>
-          );
-        })}
-      </View>
-    </View>
-  );
-}
-
 function CardSection({
   title,
   subtitle,
   cards,
+  lang,
 }: {
   title: string;
   subtitle: string;
   cards: FriendCardData[];
+  lang: AppLanguage;
 }) {
   return (
     <View style={styles.section}>
@@ -1334,7 +1218,7 @@ function CardSection({
 
       <View style={styles.cardsWrap}>
         {cards.map((friend) => (
-          <FriendCard key={friend.id} friend={friend} />
+          <FriendCard key={friend.id} friend={friend} lang={lang} />
         ))}
       </View>
     </View>
@@ -1351,13 +1235,13 @@ function EmptyPeopleState({
   return (
     <View style={styles.emptyCard}>
       <StyledText style={styles.emptyTitle}>{t(lang, 'people_empty_title')}</StyledText>
-      <StyledText style={styles.emptyBody}>
-        {t(lang, 'people_empty_body')}
-      </StyledText>
+      <StyledText style={styles.emptyBody}>{t(lang, 'people_empty_body')}</StyledText>
 
       <View style={styles.emptyActions}>
         <Pressable onPress={onPressCreate} style={styles.emptyButtonPrimary}>
-          <StyledText style={styles.emptyButtonPrimaryText}>{t(lang, 'common_create')}</StyledText>
+          <StyledText style={styles.emptyButtonPrimaryText}>
+            {t(lang, 'common_create')}
+          </StyledText>
         </Pressable>
       </View>
     </View>
@@ -1368,30 +1252,38 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.background },
   header: { padding: 20 },
   headerTitle: { fontSize: 28, fontWeight: '900', color: COLORS.text },
-  tabsWrap: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    gap: 10,
-  },
-  tabPill: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: COLORS.iconBg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  tabPillActive: {
-    backgroundColor: COLORS.secondaryBg,
-    borderColor: COLORS.borderStrong,
-  },
-  tabPillText: { fontWeight: '800', color: COLORS.text },
-  tabPillTextActive: { color: COLORS.text },
   scrollContent: {
     padding: 20,
     gap: 20,
   },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+
+  tabsWrap: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  tabPill: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: COLORS.iconBg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+  },
+  tabPillActive: {
+    backgroundColor: COLORS.secondaryBg,
+    borderColor: COLORS.borderStrong,
+  },
+  tabPillText: {
+    fontWeight: '900',
+    color: COLORS.textMuted,
+  },
+  tabPillTextActive: {
+    color: COLORS.text,
+  },
+
   section: {
     gap: 12,
   },
@@ -1408,6 +1300,7 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     lineHeight: 18,
   },
+
   circlesRow: {
     paddingRight: 10,
     gap: 12,
@@ -1562,6 +1455,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.textMuted,
   },
+
   avatarRow: {
     paddingRight: 10,
     gap: 14,
@@ -1606,41 +1500,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     width: '100%',
   },
+
   cardsWrap: {
     gap: 12,
   },
-  seeingSoonCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 18,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  seeingSoonHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  seeingSoonHeaderText: {
-    flex: 1,
-    paddingRight: 12,
-  },
-  seeingSoonTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: COLORS.text,
-  },
-  seeingSoonDate: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.textMuted,
-    marginTop: 3,
-  },
-  seeingSoonArrow: {
-    fontSize: 16,
-    color: COLORS.primary,
-    fontWeight: '800',
-  },
+
   emptyCard: {
     backgroundColor: COLORS.surface,
     borderRadius: 24,
@@ -1674,110 +1538,54 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '800',
   },
-  emptyButtonSecondary: {
-    backgroundColor: COLORS.iconBg,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+
+  friendOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: COLORS.overlay,
+    justifyContent: 'center',
+    padding: 20,
   },
-  emptyButtonSecondaryText: {
-    color: COLORS.text,
-    fontWeight: '800',
-  },
-  addMeCard: {
+  newCircleRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 14,
+  borderRadius: 22,
+  padding: 16,
+  backgroundColor: COLORS.secondarySoft,
+  borderWidth: 1,
+  borderColor: '#e7d9f7',
+},
+
+circleList: {
+  gap: 12,
+},
+
+circleRowCard: {
   backgroundColor: COLORS.surface,
   borderRadius: 22,
-  padding: 18,
+  padding: 14,
   borderWidth: 1,
-  borderColor: COLORS.borderStrong,
-  gap: 14,
+  borderColor: COLORS.border,
+  gap: 12,
 },
 
-addMeTitle: {
-  fontSize: 18,
-  fontWeight: '900',
-  color: COLORS.text,
+circleRowMain: {
+  flexDirection: 'row',
+  gap: 12,
 },
 
-addMeSubtitle: {
-  marginTop: 4,
-  fontSize: 13,
-  lineHeight: 18,
-  color: COLORS.textMuted,
-},
-
-addMeButton: {
-  alignSelf: 'flex-start',
-  backgroundColor: COLORS.primary,
-  paddingHorizontal: 16,
-  paddingVertical: 10,
-  borderRadius: 999,
-},
-
-addMeButtonText: {
-  color: '#fff',
-  fontWeight: '900',
-},
-
-qrOverlay: {
+circleRowContent: {
   flex: 1,
-  backgroundColor: 'rgba(0,0,0,0.55)',
+},
+
+circleRowHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
   alignItems: 'center',
-  justifyContent: 'center',
-  padding: 24,
-},
-
-qrCard: {
-  width: '100%',
-  maxWidth: 360,
-  backgroundColor: COLORS.surface,
-  borderRadius: 28,
-  padding: 24,
-  alignItems: 'center',
-},
-
-qrClose: {
-  position: 'absolute',
-  top: 12,
-  right: 16,
-  zIndex: 2,
-},
-
-qrCloseText: {
-  fontSize: 30,
-  fontWeight: '700',
-  color: COLORS.text,
-},
-
-qrAvatar: {
-  width: 72,
-  height: 72,
-  borderRadius: 36,
-  backgroundColor: COLORS.iconBg,
-  marginBottom: 12,
-},
-
-qrTitle: {
-  fontSize: 22,
-  fontWeight: '900',
-  color: COLORS.text,
-  textAlign: 'center',
-},
-
-qrSubtitle: {
-  marginTop: 6,
-  fontSize: 14,
-  color: COLORS.textMuted,
-  textAlign: 'center',
-  lineHeight: 20,
-},
-
-qrBox: {
-  marginTop: 20,
-  backgroundColor: '#fff',
-  padding: 16,
-  borderRadius: 18,
+  gap: 10,
 },
 });

@@ -75,23 +75,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Feed',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons
-              name={focused ? 'home' : 'home-outline'}
-              size={24}
-              color={color}
-            />
-          ),
-        }}
-      />
-
-      <Tabs.Screen
-        name="events"
-        options={{
           title: 'Events',
           tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons
+            <Ionicons
               name={focused ? 'calendar' : 'calendar-outline'}
               size={24}
               color={color}
@@ -99,6 +85,25 @@ export default function TabLayout() {
           ),
         }}
       />
+<Tabs.Screen
+  name="events"
+  options={{
+    href: null,
+  }}
+/>
+      <Tabs.Screen
+  name="share-profile"
+  options={{
+    title: 'Share',
+    tabBarIcon: ({ color, focused }) => (
+      <Ionicons
+        name={focused ? 'qr-code' : 'qr-code-outline'}
+        size={24}
+        color={color}
+      />
+    ),
+  }}
+/>
 
       <Tabs.Screen
         name="people"
