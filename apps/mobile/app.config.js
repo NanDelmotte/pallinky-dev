@@ -35,7 +35,7 @@ export default {
     name: CURRENT_APP.name,
     slug: 'tarti-flette',
     scheme: CURRENT_APP.scheme,
-    version: '1.1.1',
+    version: '1.1.2',
     orientation: 'portrait',
     icon: CURRENT_APP.icon,
     userInterfaceStyle: 'light',

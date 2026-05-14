@@ -140,18 +140,23 @@ function buildFriendCardFromSignal(
     : [];
   const mutualBridgeCount = Number(payload?.mutualBridgeCount || bridgeNames.length || 0);
 
-  const lastSeenEventTitle =
-    signal.type === 'suggested_connection' && payload?.reason === 'friend_of_friend'
-      ? bridgeNames.length > 1
-        ? t(lang, 'people_you_both_know_plus_others', {
-            name: bridgeNames[0],
-            count: String(bridgeNames.length - 1),
-          })
-        : bridgeNames.length === 1
-          ? t(lang, 'people_you_both_know', { name: bridgeNames[0] })
-          : t(lang, 'people_connected_through_network')
-      : payload?.lastSeenEventTitle || t(lang, 'people_event_fallback');
+  const isFutureEvent =
+  payload?.lastSeenAt &&
+  new Date(payload.lastSeenAt).getTime() > Date.now();
 
+const lastSeenEventTitle =
+  signal.type === 'suggested_connection' && payload?.reason === 'friend_of_friend'
+    ? bridgeNames.length > 1
+      ? t(lang, 'people_you_both_know_plus_others', {
+          name: bridgeNames[0],
+          count: String(bridgeNames.length - 1),
+        })
+      : bridgeNames.length === 1
+        ? t(lang, 'people_you_both_know', { name: bridgeNames[0] })
+        : t(lang, 'people_connected_through_network')
+    : isFutureEvent
+      ? `Going to ${payload?.lastSeenEventTitle || t(lang, 'people_event_fallback')}`
+      : payload?.lastSeenEventTitle || t(lang, 'people_event_fallback');
   return {
     id: email,
     name,
@@ -665,16 +670,29 @@ const [
       deviceContactCount,
     });
   }, [data, deviceContactCount]);
+const socialCircles = useMemo(() => {
+  return (Array.isArray(data.socialCircles) ? data.socialCircles : []) as Circle[];
+}, [data.socialCircles]);
 
-  const socialCircles = useMemo(() => {
-    return (Array.isArray(data.socialCircles) ? data.socialCircles : []) as Circle[];
-  }, [data.socialCircles]);
+const directRelationshipEmailSet = useMemo(() => {
+  return new Set(
+    (Array.isArray(data.relationships) ? data.relationships : [])
+      .map((row: any) => normalizeEmail(row.people?.email_lc))
+      .filter(Boolean)
+  );
+}, [data.relationships]);
 
-  const innerCircleSignals = useMemo(() => {
-    return sortBySharedEventsDesc(
-      dedupeByPerson(feed.items.filter((item) => item.type === 'inner_circle_person'))
-    ).slice(0, 6);
-  }, [feed.items]);
+const innerCircleSignals = useMemo(() => {
+  return sortBySharedEventsDesc(
+    dedupeByPerson(
+      feed.items.filter(
+        (item) =>
+          item.type === 'inner_circle_person' &&
+          directRelationshipEmailSet.has(normalizeEmail(item.personEmail))
+      )
+    )
+  ).slice(0, 6);
+}, [feed.items, directRelationshipEmailSet]);
 
   const innerCircleEmails = useMemo(() => {
     return new Set(innerCircleSignals.map((item) => normalizeEmail(item.personEmail)));
@@ -685,16 +703,17 @@ const [
   }, [feed.items]);
 
   const activeConnectionSignals = useMemo(() => {
-    return sortByLastSeenDesc(
-      dedupeByPerson(
-        feed.items.filter(
-          (item) =>
-            item.type === 'active_connection' &&
-            !innerCircleEmails.has(normalizeEmail(item.personEmail))
-        )
+  return sortByLastSeenDesc(
+    dedupeByPerson(
+      feed.items.filter(
+        (item) =>
+          item.type === 'active_connection' &&
+          Number(item.payload?.sharedEvents || 0) > 0 &&
+          !innerCircleEmails.has(normalizeEmail(item.personEmail))
       )
-    ).slice(0, 15);
-  }, [feed.items, innerCircleEmails]);
+    )
+  ).slice(0, 15);
+}, [feed.items, innerCircleEmails]);
 
   const reconnectCards = useMemo(() => {
     return sortByLastSeenDesc(

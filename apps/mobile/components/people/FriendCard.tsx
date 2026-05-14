@@ -75,13 +75,13 @@ export default function FriendCard({ friend }: { friend: FriendCardData }) {
               ? `${friend.crossedPathsCount} mutual ${
                   friend.crossedPathsCount === 1 ? 'connection' : 'connections'
                 }`
-              : `You've crossed paths ${friend.crossedPathsCount} ${
-                  friend.crossedPathsCount === 1 ? 'time' : 'times'
+              : ` ${friend.crossedPathsCount} ${
+                  friend.crossedPathsCount === 1 ? 'event' : 'events'
                 }`}
           </StyledText>
 
           <StyledText style={styles.friendSummarySub}>
-            {`Last seen at: ${friend.lastSeenAtEventTitle}`}
+            {`${friend.lastSeenAtEventTitle}`}
           </StyledText>
 
           <StyledText style={styles.friendSummarySubMuted}>
