@@ -102,7 +102,7 @@ function getRsvpLabel(status: string | null | undefined) {
   const normalized = normalizeStatus(status);
 
   if (normalized === 'yes' || normalized === 'going') return 'Going';
-  if (normalized === 'maybe' || normalized === 'interested') return 'Interested';
+  if (normalized === 'maybe' || normalized === 'interested') return 'Maybe';
   if (normalized === 'no' || normalized === 'not_going' || normalized === 'declined') {
     return 'Not going';
   }
@@ -398,7 +398,7 @@ function HostActionsSection({
         ]}
         onPress={onInvite}
       >
-        <Text style={[styles.hostActionText, { color: theme.text }]}>Invite</Text>
+        <Text style={[styles.hostActionText, { color: theme.text }]}>Share</Text>
       </TouchableOpacity>
 
       <TouchableOpacity

@@ -41,8 +41,9 @@ type IdeaPrompt = {
   emoji: string;
   titleKey: TranslationKey;
   subtitleKey: TranslationKey;
+  prefillTitleKey?: TranslationKey;
+  prefillDescKey?: TranslationKey;
   route: string;
-  params?: Record<string, string>;
 };
 
 const IDEA_PROMPTS: IdeaPrompt[] = [
@@ -55,25 +56,21 @@ const IDEA_PROMPTS: IdeaPrompt[] = [
   },
   {
     key: 'coffee',
-    emoji: '☕',
-    titleKey: 'home_idea_coffee_title',
-    subtitleKey: 'home_idea_coffee_subtitle',
-    route: '/create/vibe',
-    params: {
-      prefill_title: 'Coffee?',
-      prefill_desc: 'Anyone up for coffee?',
-    },
-  },
+  emoji: '☕',
+  titleKey: 'home_idea_coffee_title',
+  subtitleKey: 'home_idea_coffee_subtitle',
+  prefillTitleKey: 'home_idea_coffee_prefill_title',
+  prefillDescKey: 'home_idea_coffee_prefill_desc',
+  route: '/create/vibe',
+},
   {
     key: 'drinks',
     emoji: '🍸',
     titleKey: 'home_idea_drinks_title',
     subtitleKey: 'home_idea_drinks_subtitle',
+    prefillTitleKey: 'home_idea_drinks_prefill_title',
+prefillDescKey: 'home_idea_drinks_prefill_desc',
     route: '/create/vibe',
-    params: {
-      prefill_title: 'Drinks?',
-      prefill_desc: 'Thinking about drinks. Who’s in?',
-    },
   },
   {
     key: 'dinner',
@@ -81,34 +78,32 @@ const IDEA_PROMPTS: IdeaPrompt[] = [
     titleKey: 'home_idea_dinner_title',
     subtitleKey: 'home_idea_dinner_subtitle',
     route: '/create/formal',
-    params: {
-      prefill_title: 'Dinner',
-      prefill_desc: 'Come join for dinner.',
+    prefillTitleKey: 'home_idea_dinner_prefill_title',
+prefillDescKey: 'home_idea_dinner_prefill_desc',
     },
-  },
   {
     key: 'walk',
     emoji: '🚶',
     titleKey: 'home_idea_walk_title',
     subtitleKey: 'home_idea_walk_subtitle',
     route: '/create/vibe',
-    params: {
-      prefill_title: 'Walk?',
-      prefill_desc: 'Anyone up for a walk?',
+    
+     prefillTitleKey: 'home_idea_walk_prefill_title',
+prefillDescKey: 'home_idea_walk_prefill_desc',
     },
-  },
+
   {
     key: 'movie',
     emoji: '🎬',
     titleKey: 'home_idea_movie_title',
     subtitleKey: 'home_idea_movie_subtitle',
     route: '/create/vibe',
-    params: {
-      prefill_title: 'Movie?',
-      prefill_desc: 'Thinking about a movie night. Interested?',
-    },
-  },
-];
+    
+     prefillTitleKey: 'home_idea_movie_prefill_title',
+prefillDescKey: 'home_idea_movie_prefill_desc',
+    }, ];
+
+
 
 function normalizeEmail(value: string | null | undefined) {
   return (value || '').toLowerCase().trim();
@@ -133,19 +128,20 @@ useEffect(() => {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   const [data, setData] = useState<any>({
-    events: [],
-    rsvps: [],
-    vibeResponses: [],
-    secondDegreeEvents: [],
-    secondDegreeRsvps: [],
-    invites: [],
-    socialCircles: [],
-    contacts: [],
-    userEmail: '',
-    userPersonId: '',
-    chatSummaries: {},
-    accessByEventId: {},
-  });
+  events: [],
+  rsvps: [],
+  vibeResponses: [],
+  secondDegreeEvents: [],
+  secondDegreeRsvps: [],
+  invites: [],
+  socialCircles: [],
+  relationships: [],
+  contacts: [],
+  userEmail: '',
+  userPersonId: '',
+  chatSummaries: {},
+  accessByEventId: {},
+});
 
   const loadData = async () => {
     if (!session?.user?.email) {
@@ -187,10 +183,34 @@ useEffect(() => {
 
       setAvatarUrl((profile as any)?.avatar_url || null);
 
-      const userPersonId = normalizeId((mePerson as any)?.id);
+const userPersonId = normalizeId((mePerson as any)?.id);
 
-      const [
-        hostedEventsRes,
+const { data: relationshipRows, error: relationshipError } = await supabase
+  .from('relationships')
+  .select(`
+    related_person_id,
+    source,
+    people:related_person_id (
+      id,
+      email_lc,
+      matched_user_id
+    )
+  `)
+  .eq('owner_user_id', session.user.id)
+  .eq('relationship_type', 'direct');
+
+if (relationshipError) throw relationshipError;
+
+const directRelationshipEmails = Array.from(
+  new Set(
+    (relationshipRows || [])
+      .map((row: any) => normalizeEmail(row.people?.email_lc))
+      .filter((email: string) => email && email !== emailLower)
+  )
+);
+
+const [
+  hostedEventsRes,
         invitesRes,
         myRsvpsRes,
         myVibeResponsesRes,
@@ -284,13 +304,14 @@ useEffect(() => {
       }
 
       const relatedHostEmails = Array.from(
-        new Set([
-          ...circleMemberEmails,
-          ...sharedHistoryRsvps
-            .map((r: any) => normalizeEmail(r.email_lc || r.email))
-            .filter((email: string) => email && email !== emailLower),
-        ])
-      );
+  new Set([
+    ...directRelationshipEmails,
+    ...circleMemberEmails,
+    ...sharedHistoryRsvps
+      .map((r: any) => normalizeEmail(r.email_lc || r.email))
+      .filter((email: string) => email && email !== emailLower),
+  ])
+);
 
       let relatedHostedEvents: any[] = [];
       if (relatedHostEmails.length > 0) {
@@ -454,19 +475,20 @@ useEffect(() => {
       const chatSummaries = Object.fromEntries(chatSummaryPairs);
 
       setData({
-        events: allEvents,
-        rsvps: eventRsvps,
-        vibeResponses: myVibeResponsesRes.data || [],
-        secondDegreeEvents,
-        secondDegreeRsvps: secondDegreeEventRsvps,
-        invites: visibleInvites,
-        socialCircles,
-        contacts: deviceContactsRes.data || [],
-        chatSummaries,
-        accessByEventId,
-        userEmail: emailLower,
-        userPersonId,
-      });
+  events: allEvents,
+  rsvps: eventRsvps,
+  vibeResponses: myVibeResponsesRes.data || [],
+  secondDegreeEvents,
+  secondDegreeRsvps: secondDegreeEventRsvps,
+  invites: visibleInvites,
+  socialCircles,
+  relationships: relationshipRows || [],
+  contacts: deviceContactsRes.data || [],
+  chatSummaries,
+  accessByEventId,
+  userEmail: emailLower,
+  userPersonId,
+});
     } catch (error) {
       console.error('Social Feed data load failed', error);
     } finally {
@@ -483,6 +505,7 @@ useEffect(() => {
  const theme = DASHBOARD_THEMES[themeKey] || DASHBOARD_THEMES.classic;
 
   const feed = useMemo(() => {
+    
     const result = deriveFeedSignals({
       data,
       deviceContactCount,
@@ -494,31 +517,46 @@ useEffect(() => {
   const feedState: FeedState = feed.feedState;
 
   const brewingSignals = useMemo(() => {
-    const accessByEventId = data.accessByEventId || {};
+  const accessByEventId = data.accessByEventId || {};
 
-    const base = feed.items.filter((s) => {
-      const evId = String(s?.payload?.id || s?.eventId || '');
-      if (!evId) return false;
+  const base = feed.items.filter((s) => {
+    const evId = String(s?.payload?.id || s?.eventId || '');
+    if (!evId) return false;
+    if (accessByEventId[evId]?.can_see !== true) return false;
 
-      if (accessByEventId[evId]?.can_see !== true) return false;
+    return s.type === 'upcoming_plan' || s.type === 'event_starting_soon';
+  });
 
-      return s.type === 'upcoming_plan' || s.type === 'event_starting_soon';
-    });
+  const hostedEvents = data.events
+    .filter(
+      (ev: any) =>
+        normalizeEmail(ev.host_email) === data.userEmail &&
+        accessByEventId[String(ev.id)]?.can_see === true
+    )
+    .map((ev: any) => ({
+      id: `hosted_event:${ev.id}`,
+      type: 'upcoming_plan',
+      payload: ev,
+    }));
 
-    const hostedEvents = data.events
-      .filter(
-        (ev: any) =>
-          normalizeEmail(ev.host_email) === data.userEmail &&
-          accessByEventId[String(ev.id)]?.can_see === true
-      )
-      .map((ev: any) => ({
-        id: `hosted_event:${ev.id}`,
-        type: 'upcoming_plan',
-        payload: ev,
-      }));
+  return [...hostedEvents, ...base];
+}, [feed.items, data]);
 
-    return [...hostedEvents, ...base];
-  }, [feed, data]);
+const directFriendActivitySignals = useMemo(() => {
+  return feed.items.filter(
+    (s) =>
+      (s.type === 'friend_created_event' || s.type === 'friend_attending_event') &&
+      s.payload?._feed_scope !== 'second_degree'
+  );
+}, [feed.items]);
+
+const secondDegreeActivitySignals = useMemo(() => {
+  return feed.items.filter(
+    (s) =>
+      (s.type === 'friend_created_event' || s.type === 'friend_attending_event') &&
+      s.payload?._feed_scope === 'second_degree'
+  );
+}, [feed.items]);
 
   const compactStartSomething = feedState === 'mature_network';
   const visibleIdeaPrompts =
@@ -574,16 +612,24 @@ useEffect(() => {
               subtitle={t(lang, 'home_start_something_cold_subtitle')}
               theme={theme}
             />
-            <StartSomethingSection
-              prompts={visibleIdeaPrompts}
-              lang={lang}
-              onPressPrompt={(prompt) =>
-                router.push({
-                  pathname: prompt.route as any,
-                  params: prompt.params,
-                })
-              }
-            />
+            
+<StartSomethingSection
+  prompts={visibleIdeaPrompts}
+  lang={lang}
+  onPressPrompt={(prompt) =>
+    router.push({
+      pathname: prompt.route as any,
+      params: {
+        prefill_title: prompt.prefillTitleKey
+          ? t(lang, prompt.prefillTitleKey)
+          : t(lang, prompt.titleKey),
+        prefill_desc: prompt.prefillDescKey
+          ? t(lang, prompt.prefillDescKey)
+          : t(lang, prompt.subtitleKey),
+      },
+    } as any)
+  }
+/>
 
             <FeedSectionHeader
               title={t(lang, 'home_happening_title')}
@@ -606,33 +652,48 @@ useEffect(() => {
               onRefresh={loadData}
             />
 
-            {feed.items.some(
-  (s) => s.type === 'friend_created_event' || s.type === 'friend_attending_event'
-) && (
-              <>
-                <FeedSectionHeader
-                  title={t(lang, 'home_friends_active_title')}
-                  subtitle={t(lang, 'home_friends_active_subtitle')}
-                  theme={theme}
-                />
-                <FriendsActivities
+            {directFriendActivitySignals.length > 0 && (
+  <>
+    <FeedSectionHeader
+      title={t(lang, 'home_friends_active_title')}
+      subtitle={t(lang, 'home_friends_active_subtitle')}
+      theme={theme}
+    />
+    <FriendsActivities
+      data={data}
+      theme={theme}
+      signals={directFriendActivitySignals}
+      onRefresh={loadData}
+    />
+  </>
+)}
+
+
+{secondDegreeActivitySignals.length > 0 && (
+  <>
+    <FeedSectionHeader
+      title={t(lang, 'home_extended_network_title')}
+      subtitle={t(lang, 'home_extended_network_subtitle')}
+      theme={theme}
+    />
+    <FriendsActivities
+      data={data}
+      theme={theme}
+      signals={secondDegreeActivitySignals}
+      onRefresh={loadData}
+    />
+  </>
+)}
+
+            {/* 
+<ReconnectSection
   data={data}
   theme={theme}
-  signals={feed.items.filter(
-    (s) => s.type === 'friend_created_event' || s.type === 'friend_attending_event'
-  )}
+  signals={feed.items}
   onRefresh={loadData}
+  lang={lang}
 />
-              </>
-            )}
-
-            <ReconnectSection
-              data={data}
-              theme={theme}
-              signals={feed.items}
-              onRefresh={loadData}
-              lang={lang}
-            />
+*/}
 
             <FeedSectionHeader
               title={t(lang, 'home_start_something_title')}
@@ -640,17 +701,26 @@ useEffect(() => {
               theme={theme}
               compact={compactStartSomething}
             />
-            <StartSomethingSection
-              prompts={visibleIdeaPrompts}
-              lang={lang}
-              compact={compactStartSomething}
-              onPressPrompt={(prompt) =>
-                router.push({
-                  pathname: prompt.route as any,
-                  params: prompt.params,
-                })
-              }
-            />
+           
+
+<StartSomethingSection
+  prompts={visibleIdeaPrompts}
+  lang={lang}
+  compact={compactStartSomething}
+  onPressPrompt={(prompt) =>
+    router.push({
+      pathname: prompt.route as any,
+      params: {
+        prefill_title: prompt.prefillTitleKey
+          ? t(lang, prompt.prefillTitleKey)
+          : t(lang, prompt.titleKey),
+        prefill_desc: prompt.prefillDescKey
+          ? t(lang, prompt.prefillDescKey)
+          : t(lang, prompt.subtitleKey),
+      },
+    } as any)
+  }
+/>
           </>
         )}
 

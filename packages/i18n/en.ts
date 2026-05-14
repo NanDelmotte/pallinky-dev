@@ -91,7 +91,8 @@ home_friends_active_title: 'Your friends active plans',
 home_friends_active_subtitle:
   "Don't worry, they said you could peek, and we won't show them that you did",
 home_connect_title: 'Connect',
-home_connect_subtitle:
+home_extended_network_title: 'Plans from your extended network',
+home_extended_network_subtitle: 'Friends of friends plans',home_connect_subtitle:
   'Widen your circles. These are people you may know based on your network and contacts.',
 
 home_idea_make_plan_title: 'Make a Plan',
@@ -145,4 +146,21 @@ people_connected_through_network: 'Connected through your network',
 people_you_both_know: 'You both know {name}',
 people_you_both_know_plus_others: 'You both know {name} + {count} others',
 common_create: 'Create',
+people_qr_card_title: 'Add me on Pallinky',
+people_qr_card_subtitle: 'Show your QR code so someone can add you as a direct connection.',
+people_qr_card_button: 'Show QR',
+people_qr_modal_title: 'Add {name}',
+people_qr_modal_subtitle: 'Scan this QR code to add me on Pallinky.',
+event_card_badge_invited: 'Invited',
+// ADD TO en.ts
+home_idea_coffee_prefill_title: 'Coffee this week',
+home_idea_coffee_prefill_desc: 'Anyone up for coffee this week?',
+home_idea_drinks_prefill_title: 'Drinks tonight',
+home_idea_drinks_prefill_desc: 'Thinking about drinks tonight. Who’s in?',
+home_idea_dinner_prefill_title: 'Dinner this weekend',
+home_idea_dinner_prefill_desc: 'Come join for dinner this weekend.',
+home_idea_walk_prefill_title: 'Walk in the park',
+home_idea_walk_prefill_desc: 'Anyone up for a walk in the park?',
+home_idea_movie_prefill_title: 'Movie night',
+home_idea_movie_prefill_desc: 'Thinking about a movie night. Interested?',
 };

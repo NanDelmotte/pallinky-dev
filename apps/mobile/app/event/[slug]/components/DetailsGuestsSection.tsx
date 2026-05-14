@@ -43,7 +43,7 @@ function getSectionKey(status: string | null | undefined) {
 
   if (normalized === 'voted') return 'voted';
   if (normalized === 'yes' || normalized === 'going') return 'going';
-  if (normalized === 'maybe' || normalized === 'interested') return 'interested';
+  if (normalized === 'maybe' || normalized === 'interested') return 'maybe';
   if (normalized === 'no' || normalized === 'not_going' || normalized === 'declined') {
     return 'not_going';
   }

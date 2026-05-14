@@ -10,7 +10,7 @@ import {
 import { StyledText } from './BaseComponents';
 import { Ionicons } from '@expo/vector-icons';
 import { t } from '@pallinky/i18n';
-import type { AppLanguage } from '@pallinky/i18n';
+import type { AppLanguage } from '@pallinky/i18n/types';
 
 const PALETTES: Record<
   string,
@@ -127,19 +127,23 @@ const EventFeedCard = ({
 
   const isReachOut = eventType === 'reach_out';
 
+const normalizedStatus = status?.toLowerCase();
+
 const baseBadgeLabel =
-  status?.toLowerCase() === 'past'
+  normalizedStatus === 'past'
     ? t(lang, 'event_card_badge_past')
-    : status?.toLowerCase() === 'host'
+    : normalizedStatus === 'host'
     ? isReachOut
       ? t(lang, 'event_card_badge_planning')
       : t(lang, 'event_card_badge_planned')
-    : status?.toLowerCase() === 'pending'
+    : normalizedStatus === 'pending'
     ? t(lang, 'event_card_badge_pending')
-    : status?.toLowerCase() === 'guest'
+    : normalizedStatus === 'guest'
     ? isReachOut
       ? t(lang, 'event_card_badge_planning')
       : t(lang, 'event_card_badge_joined')
+    : normalizedStatus === 'network'
+    ? t(lang, 'event_card_badge_invited')
     : t(lang, 'event_card_badge_plan');
 
   const normalizedParticipants: ParticipantAvatar[] =
@@ -221,7 +225,7 @@ const baseBadgeLabel =
             )}
 
             <StyledText style={styles.hostText} numberOfLines={1}>
-              {status?.toLowerCase() === 'past'
+              {normalizedStatus === 'past'
   ? isHost
     ? t(lang, 'event_card_you_organized')
     : t(lang, 'event_card_host_organized', { host: hostName })

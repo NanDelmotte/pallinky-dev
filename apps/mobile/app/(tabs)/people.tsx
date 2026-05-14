@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
   Image,
   Pressable,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -23,7 +24,7 @@ import { StyledText } from '@pallinky/ui';
 import { supabase, useSession } from '@pallinky/core';
 import { t } from '@pallinky/i18n';
 import type { AppLanguage } from '@pallinky/i18n/types';
-
+import QRCode from 'react-native-qrcode-svg';
 import FriendCard, { FriendCardData } from '../../components/people/FriendCard';
 import CircleManagerSheet from '../../components/circles/CircleManagerSheet';
 import type {
@@ -216,18 +217,21 @@ export default function PeopleScreen() {
   const [deviceContactCount, setDeviceContactCount] = useState(0);
 
   const [data, setData] = useState<any>({
-    events: [],
-    rsvps: [],
-    invites: [],
-    socialCircles: [] as Circle[],
-    socialIntent: [],
-    contacts: [],
-    chatSummaries: {},
-    accessByEventId: {},
-    userEmail: '',
-  });
+  events: [],
+  rsvps: [],
+  invites: [],
+  socialCircles: [] as Circle[],
+  relationships: [],
+  socialIntent: [],
+  contacts: [],
+  chatSummaries: {},
+  accessByEventId: {},
+  userEmail: '',
+});
 
   const [profileMap, setProfileMap] = useState<Map<string, PersonProfile>>(new Map());
+const [myProfile, setMyProfile] = useState<{ id: string; full_name?: string | null; avatar_url?: string | null } | null>(null);
+const [qrVisible, setQrVisible] = useState(false);
   const [selectedFriend, setSelectedFriend] = useState<FriendCardData | null>(null);
 
   const [circleManagerVisible, setCircleManagerVisible] = useState(false);
@@ -298,13 +302,39 @@ export default function PeopleScreen() {
       setDeviceContactCount(nextDeviceContactCount);
 
       const { data: profile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', session.user.id)
-        .maybeSingle();
+  .from('profiles')
+  .select('id, full_name, avatar_url')
+  .eq('id', session.user.id)
+  .maybeSingle();
 
-      const [
-        hostedEventsRes,
+setMyProfile(profile || null);
+
+const { data: relationshipRows, error: relationshipError } = await supabase
+  .from('relationships')
+  .select(`
+    related_person_id,
+    source,
+    people:related_person_id (
+      id,
+      email_lc,
+      matched_user_id
+    )
+  `)
+  .eq('owner_user_id', session.user.id)
+  .eq('relationship_type', 'direct');
+
+if (relationshipError) throw relationshipError;
+
+const directRelationshipEmails = Array.from(
+  new Set(
+    (relationshipRows || [])
+      .map((row: any) => normalizeEmail(row.people?.email_lc))
+      .filter((email: string) => email && email !== emailLower)
+  )
+);
+
+const [
+  hostedEventsRes,
         invitesRes,
         myRsvpsRes,
         circlesRes,
@@ -401,13 +431,14 @@ export default function PeopleScreen() {
       }
 
       const relatedHostEmails = Array.from(
-        new Set([
-          ...circleMemberEmails,
-          ...sharedHistoryRsvps
-            .map((r: any) => normalizeEmail(r.email_lc || r.email))
-            .filter((email: string) => email && email !== emailLower),
-        ])
-      );
+  new Set([
+    ...directRelationshipEmails,
+    ...circleMemberEmails,
+    ...sharedHistoryRsvps
+      .map((r: any) => normalizeEmail(r.email_lc || r.email))
+      .filter((email: string) => email && email !== emailLower),
+  ])
+);
 
       let relatedHostedEvents: any[] = [];
       if (relatedHostEmails.length > 0) {
@@ -527,19 +558,20 @@ export default function PeopleScreen() {
 
       const chatSummaries = Object.fromEntries(chatSummaryPairs);
 
-      const nextData = {
-        events: allEvents,
-        rsvps: eventRsvps,
-        invites: invitesRes.data || [],
-        socialCircles,
-        socialIntent: socialIntentRes.data || [],
-        contacts: deviceContactsRes.data || [],
-        chatSummaries,
-        accessByEventId: Object.fromEntries(
-          allEvents.map((ev: any) => [String(ev.id), { can_see: true }])
-        ),
-        userEmail: emailLower,
-      };
+     const nextData = {
+  events: allEvents,
+  rsvps: eventRsvps,
+  invites: invitesRes.data || [],
+  socialCircles,
+  relationships: relationshipRows || [],
+  socialIntent: socialIntentRes.data || [],
+  contacts: deviceContactsRes.data || [],
+  chatSummaries,
+  accessByEventId: Object.fromEntries(
+    allEvents.map((ev: any) => [String(ev.id), { can_see: true }])
+  ),
+  userEmail: emailLower,
+};
 
       setData(nextData);
 
@@ -584,8 +616,9 @@ export default function PeopleScreen() {
                 return [];
               })
               .filter(Boolean),
-            ...socialIntentHostEmails,
-            ...circleMemberEmails,
+           ...socialIntentHostEmails,
+...circleMemberEmails,
+...directRelationshipEmails,
           ]
         )
       );
@@ -759,7 +792,14 @@ export default function PeopleScreen() {
     reconnectCards.length > 0 ||
     suggestedCards.length > 0 ||
     socialIntentCards.length > 0;
+const myDisplayName =
+  myProfile?.full_name?.trim() ||
+  session?.user?.email?.split('@')[0] ||
+  t(lang, 'people_person_fallback');
 
+const myQrValue = myProfile?.id
+  ? `https://pallinky.com/add?profileId=${myProfile.id}`
+  : '';
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
@@ -774,8 +814,14 @@ export default function PeopleScreen() {
             <ActivityIndicator color={COLORS.primary} />
           </View>
         ) : (
-          <ScrollView contentContainerStyle={styles.scrollContent}>
-            <CirclesSection
+         <ScrollView contentContainerStyle={styles.scrollContent}>
+  <AddMeQrCard
+    lang={lang}
+    disabled={!myQrValue}
+    onPress={() => setQrVisible(true)}
+  />
+
+  <CirclesSection
               circles={socialCircles}
               profileMap={profileMap}
               lang={lang}
@@ -870,7 +916,40 @@ export default function PeopleScreen() {
           </View>
         </Pressable>
       )}
+<Modal visible={qrVisible} transparent animationType="fade">
+  <Pressable style={styles.qrOverlay} onPress={() => setQrVisible(false)}>
+    <Pressable style={styles.qrCard}>
+      <Pressable style={styles.qrClose} onPress={() => setQrVisible(false)}>
+        <StyledText style={styles.qrCloseText}>×</StyledText>
+      </Pressable>
 
+      <Image
+        source={{
+          uri:
+            myProfile?.avatar_url ||
+            `https://ui-avatars.com/api/?name=${encodeURIComponent(
+              myDisplayName
+            )}&background=43691b&color=fff`,
+        }}
+        style={styles.qrAvatar}
+      />
+
+      <StyledText style={styles.qrTitle}>
+        {t(lang, 'people_qr_modal_title', { name: myDisplayName })}
+      </StyledText>
+
+      <StyledText style={styles.qrSubtitle}>
+        {t(lang, 'people_qr_modal_subtitle')}
+      </StyledText>
+
+      {myQrValue ? (
+        <View style={styles.qrBox}>
+          <QRCode value={myQrValue} size={220} />
+        </View>
+      ) : null}
+    </Pressable>
+  </Pressable>
+</Modal>
       {!!session?.user?.id && (
         <CircleManagerSheet
           visible={circleManagerVisible}
@@ -885,7 +964,38 @@ export default function PeopleScreen() {
     </SafeAreaView>
   );
 }
+function AddMeQrCard({
+  lang,
+  disabled,
+  onPress,
+}: {
+  lang: AppLanguage;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      disabled={disabled}
+      onPress={onPress}
+      style={[styles.addMeCard, disabled && { opacity: 0.5 }]}
+    >
+      <View>
+        <StyledText style={styles.addMeTitle}>
+          {t(lang, 'people_qr_card_title')}
+        </StyledText>
+        <StyledText style={styles.addMeSubtitle}>
+          {t(lang, 'people_qr_card_subtitle')}
+        </StyledText>
+      </View>
 
+      <View style={styles.addMeButton}>
+        <StyledText style={styles.addMeButtonText}>
+          {t(lang, 'people_qr_card_button')}
+        </StyledText>
+      </View>
+    </Pressable>
+  );
+}
 function CirclesSection({
   circles,
   profileMap,
@@ -1557,4 +1667,98 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontWeight: '800',
   },
+  addMeCard: {
+  backgroundColor: COLORS.surface,
+  borderRadius: 22,
+  padding: 18,
+  borderWidth: 1,
+  borderColor: COLORS.borderStrong,
+  gap: 14,
+},
+
+addMeTitle: {
+  fontSize: 18,
+  fontWeight: '900',
+  color: COLORS.text,
+},
+
+addMeSubtitle: {
+  marginTop: 4,
+  fontSize: 13,
+  lineHeight: 18,
+  color: COLORS.textMuted,
+},
+
+addMeButton: {
+  alignSelf: 'flex-start',
+  backgroundColor: COLORS.primary,
+  paddingHorizontal: 16,
+  paddingVertical: 10,
+  borderRadius: 999,
+},
+
+addMeButtonText: {
+  color: '#fff',
+  fontWeight: '900',
+},
+
+qrOverlay: {
+  flex: 1,
+  backgroundColor: 'rgba(0,0,0,0.55)',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 24,
+},
+
+qrCard: {
+  width: '100%',
+  maxWidth: 360,
+  backgroundColor: COLORS.surface,
+  borderRadius: 28,
+  padding: 24,
+  alignItems: 'center',
+},
+
+qrClose: {
+  position: 'absolute',
+  top: 12,
+  right: 16,
+  zIndex: 2,
+},
+
+qrCloseText: {
+  fontSize: 30,
+  fontWeight: '700',
+  color: COLORS.text,
+},
+
+qrAvatar: {
+  width: 72,
+  height: 72,
+  borderRadius: 36,
+  backgroundColor: COLORS.iconBg,
+  marginBottom: 12,
+},
+
+qrTitle: {
+  fontSize: 22,
+  fontWeight: '900',
+  color: COLORS.text,
+  textAlign: 'center',
+},
+
+qrSubtitle: {
+  marginTop: 6,
+  fontSize: 14,
+  color: COLORS.textMuted,
+  textAlign: 'center',
+  lineHeight: 20,
+},
+
+qrBox: {
+  marginTop: 20,
+  backgroundColor: '#fff',
+  padding: 16,
+  borderRadius: 18,
+},
 });

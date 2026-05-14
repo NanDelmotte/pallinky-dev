@@ -362,7 +362,20 @@ useEffect(() => {
 
           const participantAvatars = Array.from(participantMap.values());
 
-          return (
+const viewerRsvp = rsvps.find((r) => {
+  if (!siblingIds.has(String(r.event_id))) return false;
+  return normalizeEmail(r.email_lc || r.email) === emailLower;
+});
+
+const viewerHasJoined = isPositiveRsvpStatus(viewerRsvp?.status);
+
+const cardStatus = group.isPast
+  ? 'past'
+  : isHost
+    ? 'host'
+    : 'guest';
+
+return (
             <View key={`my-plan-wrapper-${group.key}`} style={styles.cardWrapper}>
               <EventFeedCard
                 id={ev.id}
@@ -376,7 +389,7 @@ useEffect(() => {
                 gifKey={ev.gif_key}
                 fontFamily={ev.font_family}
                 hostName={ev.host_name}
-                status={group.isPast ? 'past' : isHost ? 'host' : 'guest'}
+                status={cardStatus as any}
                 actionLabel={isHost ? 'Manage' : 'View Event'}
                 unreadMessages={aggregateUnread}
                 lastMessagePreview={null}
