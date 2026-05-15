@@ -6,7 +6,7 @@ const APP = {
   development: {
     name: 'Pallinky Dev',
     scheme: 'pallinky-dev',
-    icon: './assets/icon.png',
+    icon: './assets/icon-dev.png',
     androidIcon: './assets/android-dev.png',
   androidBackgroundColor: '#FE019A',
     iosBundleIdentifier: 'com.nancy.pallinky.dev',
@@ -135,7 +135,7 @@ export default {
     },
 
     owner: 'nanbowles',
-    runtimeVersion: '1.0.1',
+    runtimeVersion: '1.0.2',
 
     updates: {
       url: 'https://u.expo.dev/501d9f7d-62c0-47d5-9747-011f79383a97',
