@@ -1,4 +1,4 @@
-package com.nancy.pallinky.dev
+package com.nancy.pallinky
 
 import android.app.Application
 import android.content.res.Configuration

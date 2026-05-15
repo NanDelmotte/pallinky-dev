@@ -1,4 +1,4 @@
-package com.nancy.pallinky.dev
+package com.nancy.pallinky
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build
