@@ -35,7 +35,7 @@ export default {
     name: CURRENT_APP.name,
     slug: 'tarti-flette',
     scheme: CURRENT_APP.scheme,
-    version: '1.1.2',
+    version: '1.1.3',
     orientation: 'portrait',
     icon: CURRENT_APP.icon,
     userInterfaceStyle: 'light',
@@ -135,7 +135,7 @@ export default {
     },
 
     owner: 'nanbowles',
-    runtimeVersion: '1.0.2',
+    runtimeVersion: '1.1.3',
 
     updates: {
       url: 'https://u.expo.dev/501d9f7d-62c0-47d5-9747-011f79383a97',
